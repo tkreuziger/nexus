@@ -4,7 +4,8 @@ Documentation index for the Pi Session Server (nexus).
 
 ## Start here
 
-- `../README.md` — what the server does, configuration, the HTTP API, the IPC protocol, credentials, worktree layout, and the deletion policy.
+- `../README.md` — what the server does, configuration, the HTTP API, the IPC protocol, credentials, worktree layout, the deletion policy, and how the host runs it.
+- `../deploy/` — the systemd unit and the Apache vhost pair as installed on this host: state dirs, loopback port, TLS, and the proxy options the event stream needs.
 
 ## Plans
 

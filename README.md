@@ -191,6 +191,33 @@ Log in with the `owner` handle and the secret behind the bootstrap token. `@nexu
 
 A web manifest and icons ship with the app, so it can be added to a home screen with a name, an icon, and a standalone window. Installing it as an app additionally needs a service worker, which does not exist yet — that is the next step for the PWA path, not a missing piece of this one.
 
+## Deploy
+
+`deploy/nexus.service` (systemd; runs as root, because a project is a folder on the host and each session's harness tools are scoped to that folder's worktree) and `deploy/apache/` (the vhost pair: port 80 redirects, port 443 terminates TLS and proxies to the loopback server). Edit the paths for your host, then:
+
+```sh
+bun install
+bun run web:build              # apps/web/dist — restart the unit after this
+install -m 0644 deploy/nexus.service /etc/systemd/system/nexus.service
+systemctl daemon-reload && systemctl enable --now nexus
+
+install -m 0644 deploy/apache/nexus.conf /etc/apache2/sites-available/nexus.conf
+a2ensite nexus && apache2ctl configtest && systemctl reload apache2
+certbot --apache -d nexus.tristech.de --redirect   # writes nexus-le-ssl.conf
+
+# certbot's vhost, plus the proxy block: swap in the copy that carries it.
+install -m 0644 deploy/apache/nexus-le-ssl.conf /etc/apache2/sites-available/nexus-le-ssl.conf
+apache2ctl configtest && systemctl reload apache2
+```
+
+Three things the unit settles that are easy to get wrong:
+
+- **State outside the checkout.** `NEXUS_DATA_DIR=/var/lib/nexus` holds the server SQLite, the AES key and every session's Pi storage; `NEXUS_PROJECTS_ROOT=/root/nexus-projects` holds worktrees. A re-clone or a rebuild must not be able to destroy either.
+- **The first boot prints the credential.** With `NEXUS_BOOTSTRAP_TOKEN` unset the server creates user `owner` with a random secret and logs the bearer token once — `journalctl -u nexus | grep -A1 'bearer token'`. The login form wants the *secret* (the last `_`-separated part); the curl and the web client want the whole token.
+- **`flushpackets=on` is what makes the vhost stream.** Without it `mod_proxy_http` buffers, and `GET /api/sessions/:id/events` arrives in one lump when the turn ends instead of incrementally — the web app's live view then looks broken while the API is fine. `ProxyTimeout` is set well above the stream's 20s heartbeat.
+
+The unit's `WorkingDirectory` is the checkout itself: the server reads its own sources at start, but serves `NEXUS_WEB_DIR` from disk on every request, so rebuilding the bundle without `systemctl restart nexus` pairs a fresh client with a stale server.
+
 ## Development
 
 ```bash
