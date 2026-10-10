@@ -1,9 +1,11 @@
 import { ApiError } from "@nexus/client";
 import { QueryCache, QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { type ReactElement, useCallback, useEffect, useRef, useState } from "react";
-import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
+import { Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { api, setToken } from "./api.ts";
+import { UserMenu } from "./components/UserMenu.tsx";
 import { ProjectLayout } from "./layouts/ProjectLayout.tsx";
+import { SettingsLayout } from "./layouts/SettingsLayout.tsx";
 import { AuthMethodsPage } from "./pages/AuthMethodsPage.tsx";
 import { LoginScreen } from "./pages/LoginScreen.tsx";
 import { ProjectFilesPage } from "./pages/ProjectFilesPage.tsx";
@@ -70,25 +72,24 @@ function AppShell({ onSignOut }: { onSignOut: () => void }): ReactElement {
   return (
     <div className="app">
       <header className="topbar">
-        <span className="brand">nexus</span>
-        <nav className="nav" aria-label="Main">
-          <NavLink to="/" end>
-            Projects
-          </NavLink>
-          <NavLink to="/auth-methods">Auth methods</NavLink>
-        </nav>
+        <Link className="brand" to="/">
+          nexus
+        </Link>
         <div className="topbar-end">
-          {me.status === "success" ? <span className="muted">{me.data.user.handle}</span> : null}
-          <button type="button" className="button ghost" onClick={onSignOut}>
-            Sign out
-          </button>
+          <UserMenu
+            handle={me.status === "success" ? me.data.user.handle : null}
+            onSignOut={onSignOut}
+          />
         </div>
       </header>
       <main className={flush ? "main flush" : "main"}>
         <div className={flush ? "page flush" : "page"}>
           <Routes>
             <Route path="/" element={<ProjectsPage />} />
-            <Route path="/auth-methods" element={<AuthMethodsPage />} />
+            <Route path="/settings" element={<SettingsLayout />}>
+              <Route index element={<Navigate to="auth-methods" replace />} />
+              <Route path="auth-methods" element={<AuthMethodsPage />} />
+            </Route>
             <Route path="/projects/:id" element={<ProjectLayout />}>
               <Route index element={<ProjectOverviewPage />} />
               <Route path="git" element={<ProjectGitPage />} />

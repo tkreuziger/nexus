@@ -133,9 +133,13 @@ export function sessionRoutes(deps: SessionDeps): readonly Route[] {
           );
         }
         const body = await readJsonObject(request);
-        const model = modelFrom(body) ?? deps.config.defaultModel;
+        // Precedence: the request's model, then the project's default, then the server's.
+        const model = modelFrom(body) ?? project.defaultModel ?? deps.config.defaultModel;
         if (model === null) {
-          throw new HttpError(400, "no model given and NEXUS_DEFAULT_MODEL is not set");
+          throw new HttpError(
+            400,
+            "no model given and neither the project nor NEXUS_DEFAULT_MODEL sets one",
+          );
         }
         // A harness resolves the model against the same catalogue, so an unknown one would fail on the
         // first request; refusing it here makes that failure immediate and specific.

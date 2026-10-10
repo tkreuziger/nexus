@@ -1,16 +1,19 @@
-import type { CreateSessionRequest } from "@nexus/client";
+import type { CreateSessionRequest, WireModelRef } from "@nexus/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type FormEvent, type ReactElement, useState } from "react";
+import { type FormEvent, type ReactElement, useEffect, useState } from "react";
 import { api } from "../api.ts";
 import { Modal } from "./Modal.tsx";
 
 /** Create a session on a project. One dialog, opened from wherever a session is relevant. */
 export function NewSessionDialog({
   projectId,
+  defaultModel,
   open,
   onClose,
 }: {
   projectId: string;
+  /** The project's default model, used to seed the picker when the dialog opens. */
+  defaultModel: WireModelRef | null;
   open: boolean;
   onClose: () => void;
 }): ReactElement {
@@ -20,6 +23,14 @@ export function NewSessionDialog({
   const [modelId, setModelId] = useState("");
   const [baseRef, setBaseRef] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Reopen with the project's default rather than whatever the last dialog left behind. Keyed on the
+  // primitive fields so a background refetch of the project cannot reset a selection being made.
+  useEffect(() => {
+    if (!open) return;
+    setProvider(defaultModel?.provider ?? "");
+    setModelId(defaultModel?.modelId ?? "");
+  }, [open, defaultModel?.provider, defaultModel?.modelId]);
 
   const providers = useQuery({ queryKey: ["providers"], queryFn: () => api.listProviders() });
   // Only providers with something to choose, so the picker cannot lead to an empty list.

@@ -40,6 +40,7 @@ describe("registerProject", () => {
     expect(project.path).toBe(path);
     expect(project.ownerId).toBe(ownerId);
     expect(project.assignedAuthMethodId).toBeNull();
+    expect(project.defaultModel).toBeNull();
   });
 
   test("defaults the display name to the folder name", async () => {

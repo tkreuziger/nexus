@@ -131,6 +131,16 @@ export class ApiClient {
     return this.#request("PUT", `/projects/${encodeURIComponent(projectId)}/auth-method`, { body });
   }
 
+  assignDefaultModel(
+    projectId: string,
+    model: wire.WireModelRef | null,
+  ): Promise<wire.ProjectResponse> {
+    const body: wire.AssignDefaultModelRequest = { model };
+    return this.#request("PUT", `/projects/${encodeURIComponent(projectId)}/default-model`, {
+      body,
+    });
+  }
+
   /* Auth methods. */
 
   listAuthMethods(options: RequestOptions = {}): Promise<wire.ListAuthMethodsResponse> {

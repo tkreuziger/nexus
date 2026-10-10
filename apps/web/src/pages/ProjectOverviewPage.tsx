@@ -108,7 +108,12 @@ export function ProjectOverviewPage(): ReactElement {
         ) : null}
       </div>
 
-      <NewSessionDialog projectId={id} open={creating} onClose={() => setCreating(false)} />
+      <NewSessionDialog
+        projectId={id}
+        defaultModel={project.data?.project.defaultModel ?? null}
+        open={creating}
+        onClose={() => setCreating(false)}
+      />
     </section>
   );
 }

@@ -82,6 +82,13 @@ export const MIGRATIONS: readonly Migration[] = [
       `CREATE INDEX auth_methods_user ON auth_methods(user_id)`,
     ],
   },
+  {
+    version: 4,
+    statements: [
+      `ALTER TABLE projects ADD COLUMN default_model_provider TEXT`,
+      `ALTER TABLE projects ADD COLUMN default_model_id TEXT`,
+    ],
+  },
 ];
 
 /** Apply every migration newer than the database's `user_version`. */
