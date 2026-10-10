@@ -466,6 +466,63 @@ a {
   overflow-y: auto;
 }
 
+/* The prompt box and its corner control. The right padding keeps the first lines clear of the icon. */
+.composer-field {
+  position: relative;
+  display: flex;
+}
+
+.composer-field .composer-input {
+  flex: 1;
+  min-width: 0;
+  padding-right: 30px;
+}
+
+.composer-expand {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.composer-expand:hover {
+  color: var(--fg);
+  background: var(--surface);
+}
+
+.composer-expand svg {
+  display: block;
+}
+
+/* The send shortcut, drawn as key caps instead of spelled-out words. */
+.send-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.send-hint kbd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 5px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--fg);
+}
+
 /* Project frame: a sidebar of sections beside the section itself. */
 
 .project {
