@@ -24,6 +24,9 @@ export async function createUser(
   handle: string,
   secret: string,
 ): Promise<{ user: User; token: string }> {
+  if (secret.includes("_")) {
+    throw new Error("a user secret must not contain an underscore, which separates token parts");
+  }
   const id = crypto.randomUUID() as UserId;
   const tokenId = crypto.randomUUID().replaceAll("-", "").slice(0, 16);
   const token = `${TOKEN_PREFIX}_${tokenId}_${secret}`;
@@ -42,6 +45,22 @@ export async function authenticate(db: Database, token: string): Promise<User | 
   const row = db.query<UserRow, [string]>("SELECT * FROM users WHERE token_id = ?").get(tokenId);
   if (row === null || !(await Bun.password.verify(secret, row.token_hash))) return undefined;
   return toUser(row);
+}
+
+/**
+ * Verify a handle and secret and return the bearer token for later requests. Only the secret's hash is
+ * stored, so the token is reconstructed from the stored id rather than recovered — which is why the
+ * supplied secret must be the real one, and why it must not contain an underscore.
+ */
+export async function login(
+  db: Database,
+  handle: string,
+  secret: string,
+): Promise<{ token: string; user: User } | undefined> {
+  const row = db.query<UserRow, [string]>("SELECT * FROM users WHERE handle = ?").get(handle);
+  if (row === null) return undefined;
+  if (!(await Bun.password.verify(secret, row.token_hash))) return undefined;
+  return { token: `${TOKEN_PREFIX}_${row.token_id}_${secret}`, user: toUser(row) };
 }
 
 /** Look up a user by id. */

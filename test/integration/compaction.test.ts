@@ -79,6 +79,7 @@ beforeEach(async () => {
     secretKeyFile: join(base, "secret.key"),
     defaultModel: { provider: "faux", modelId: "faux-1" },
     bootstrapToken: null,
+    webDir: null,
     compaction: { reserveTokens: 100, keepRecentTokens: 200 },
   };
   const secretKey = await loadOrCreateKey(config.secretKeyFile);

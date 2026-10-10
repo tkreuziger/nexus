@@ -24,6 +24,7 @@ Documentation index for the Pi Session Server (nexus).
 - `architecture/adrs/0005-user-authentication.md` — out-of-band bearer tokens, owner-scoped queries.
 - `architecture/adrs/0006-model-selection.md` — per-session model with `NEXUS_DEFAULT_MODEL` fallback.
 - `architecture/adrs/0007-session-deletion.md` — deletion removes the worktree and preserves the branch.
+- `architecture/adrs/0008-web-frontend-origin.md` — the web app shares the API's origin; login issues a bearer token; the stream is read with `fetch`.
 
 ## Requirements
 
