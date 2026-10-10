@@ -26,10 +26,21 @@ export function SessionsPage(): ReactElement {
   const project = useQuery({ queryKey: ["project", id], queryFn: () => api.getProject(id) });
 
   const [name, setName] = useState("");
-  const [model, setModel] = useState("");
+  const [provider, setProvider] = useState("");
+  const [modelId, setModelId] = useState("");
   const [baseRef, setBaseRef] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmForce, setConfirmForce] = useState<string | null>(null);
+
+  const providers = useQuery({ queryKey: ["providers"], queryFn: () => api.listProviders() });
+  // Only providers with something to choose, so the picker cannot lead to an empty list.
+  const selectable = (providers.data?.providers ?? []).filter((entry) => entry.modelCount > 0);
+  const modelList = useQuery({
+    queryKey: ["provider-models", provider],
+    queryFn: () => api.listProviderModels(provider),
+    enabled: provider !== "",
+  });
+  const chosenModel = (modelList.data?.models ?? []).find((entry) => entry.id === modelId);
 
   const invalidate = (): Promise<void> =>
     queryClient.invalidateQueries({ queryKey: ["sessions", id] });
@@ -38,7 +49,8 @@ export function SessionsPage(): ReactElement {
     mutationFn: (body: CreateSessionRequest) => api.createSession(id, body),
     onSuccess: async () => {
       setName("");
-      setModel("");
+      setProvider("");
+      setModelId("");
       setBaseRef("");
       setFormError(null);
       await invalidate();
@@ -66,13 +78,12 @@ export function SessionsPage(): ReactElement {
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
     const body: CreateSessionRequest = { name };
-    if (model !== "") {
-      const separator = model.indexOf(":");
-      if (separator <= 0 || separator === model.length - 1) {
-        setFormError('Model must be "provider:modelId".');
+    if (provider !== "") {
+      if (modelId === "") {
+        setFormError("Choose a model, or clear the provider to use the server default.");
         return;
       }
-      body.model = { provider: model.slice(0, separator), modelId: model.slice(separator + 1) };
+      body.model = { provider, modelId };
     }
     if (baseRef !== "") body.baseRef = baseRef;
     setFormError(null);
@@ -114,14 +125,61 @@ export function SessionsPage(): ReactElement {
           onChange={(event) => setName(event.target.value)}
           required
         />
-        <label htmlFor="session-model">Model (optional)</label>
-        <input
-          id="session-model"
-          value={model}
-          placeholder="provider:modelId — defaults to NEXUS_DEFAULT_MODEL"
+        <label htmlFor="session-provider">Model provider (optional)</label>
+        <select
+          id="session-provider"
+          value={provider}
+          disabled={providers.isPending}
           aria-describedby={formError === null ? undefined : "session-model-error"}
-          onChange={(event) => setModel(event.target.value)}
-        />
+          onChange={(event) => {
+            setProvider(event.target.value);
+            setModelId("");
+          }}
+        >
+          <option value="">{providers.isPending ? "Loading providers…" : "Server default"}</option>
+          {selectable.map((entry) => (
+            <option key={entry.id} value={entry.id}>
+              {entry.name} ({entry.modelCount})
+            </option>
+          ))}
+        </select>
+        {providers.status === "error" ? (
+          <p className="error" role="alert">
+            {providers.error.message}
+          </p>
+        ) : null}
+
+        {provider === "" ? null : (
+          <>
+            <label htmlFor="session-model">Model</label>
+            <select
+              id="session-model"
+              value={modelId}
+              disabled={modelList.isPending}
+              onChange={(event) => setModelId(event.target.value)}
+            >
+              <option value="">{modelList.isPending ? "Loading models…" : "Choose a model"}</option>
+              {(modelList.data?.models ?? []).map((entry) => (
+                <option key={entry.id} value={entry.id}>
+                  {entry.name}
+                </option>
+              ))}
+            </select>
+            {chosenModel === undefined ? null : (
+              <p className="muted">
+                {chosenModel.contextWindow.toLocaleString()} token context · up to{" "}
+                {chosenModel.maxTokens.toLocaleString()} out
+                {chosenModel.reasoning ? " · reasoning" : ""} · ${chosenModel.cost.input}/$
+                {chosenModel.cost.output} per million tokens
+              </p>
+            )}
+            {modelList.status === "error" ? (
+              <p className="error" role="alert">
+                {modelList.error.message}
+              </p>
+            ) : null}
+          </>
+        )}
         <label htmlFor="session-base">Base ref (optional)</label>
         <input
           id="session-base"

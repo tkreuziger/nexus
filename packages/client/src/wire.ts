@@ -115,6 +115,31 @@ export interface WireError {
   error: { message: string };
 }
 
+/* The provider and model catalogue Pi knows about. */
+
+/**
+ * A provider with the auth it accepts. `apiKey` is null for an OAuth-only provider, and `oauth` is
+ * null for one that accepts a key only — so a client can offer exactly what works.
+ */
+export interface WireProvider {
+  id: string;
+  name: string;
+  baseUrl: string | null;
+  /** How many chat models this provider offers; zero means there is nothing to choose. */
+  modelCount: number;
+  apiKey: { name: string } | null;
+  oauth: { name: string } | null;
+}
+
+export interface WireModel {
+  id: string;
+  name: string;
+  contextWindow: number;
+  maxTokens: number;
+  reasoning: boolean;
+  cost: { input: number; output: number; cacheRead: number; cacheWrite: number };
+}
+
 /* Request bodies. */
 
 export interface LoginRequest {
@@ -238,6 +263,14 @@ export interface SubmitMessageResponse {
 
 export interface AbortedResponse {
   aborted: true;
+}
+
+export interface ListProvidersResponse {
+  providers: WireProvider[];
+}
+
+export interface ListModelsResponse {
+  models: WireModel[];
 }
 
 /* Event stream frames. */

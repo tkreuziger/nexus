@@ -1,3 +1,4 @@
+import type { WireProvider } from "@nexus/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, type ReactElement, useState } from "react";
 import { api } from "../api.ts";
@@ -5,9 +6,14 @@ import { formatTime } from "../format.ts";
 
 type MethodType = "api_key" | "oauth";
 
+/** The auth label Pi gives a provider for the chosen type, e.g. "Anthropic API key". */
+const authNameOf = (provider: WireProvider, type: MethodType): string =>
+  (type === "api_key" ? provider.apiKey?.name : provider.oauth?.name) ?? "";
+
 export function AuthMethodsPage(): ReactElement {
   const queryClient = useQueryClient();
   const methods = useQuery({ queryKey: ["auth-methods"], queryFn: () => api.listAuthMethods() });
+  const providers = useQuery({ queryKey: ["providers"], queryFn: () => api.listProviders() });
 
   const [type, setType] = useState<MethodType>("api_key");
   const [provider, setProvider] = useState("");
@@ -16,6 +22,14 @@ export function AuthMethodsPage(): ReactElement {
   const [refresh, setRefresh] = useState("");
   const [access, setAccess] = useState("");
   const [expires, setExpires] = useState("");
+
+  // Only the providers that accept this kind of auth, so the list cannot offer something that would
+  // be refused. Derived rather than reset in an effect: switching type must not leave a stale choice.
+  const candidates = (providers.data?.providers ?? []).filter((entry) =>
+    type === "api_key" ? entry.apiKey !== null : entry.oauth !== null,
+  );
+  const selected = candidates.some((entry) => entry.id === provider) ? provider : "";
+  const chosen = candidates.find((entry) => entry.id === selected);
 
   const invalidate = (): Promise<void> =>
     queryClient.invalidateQueries({ queryKey: ["auth-methods"] });
@@ -31,13 +45,13 @@ export function AuthMethodsPage(): ReactElement {
     mutationFn: () => {
       if (type === "api_key") {
         return label === ""
-          ? api.createAuthMethod({ type, provider, key })
-          : api.createAuthMethod({ type, provider, label, key });
+          ? api.createAuthMethod({ type, provider: selected, key })
+          : api.createAuthMethod({ type, provider: selected, label, key });
       }
       const credential = { refresh, access, expires: Number(expires) };
       return label === ""
-        ? api.createAuthMethod({ type, provider, credential })
-        : api.createAuthMethod({ type, provider, label, credential });
+        ? api.createAuthMethod({ type, provider: selected, credential })
+        : api.createAuthMethod({ type, provider: selected, label, credential });
     },
     onSuccess: async () => {
       setProvider("");
@@ -57,6 +71,7 @@ export function AuthMethodsPage(): ReactElement {
 
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
+    if (selected === "") return;
     create.mutate();
   };
 
@@ -65,7 +80,7 @@ export function AuthMethodsPage(): ReactElement {
       <h1>Auth methods</h1>
       <p className="muted">
         A credential is encrypted before storage and never returned — the list below shows metadata
-        only.
+        only. Providers come from Pi, so an unknown one cannot be stored.
       </p>
 
       <form className="card stack" onSubmit={submit}>
@@ -82,19 +97,38 @@ export function AuthMethodsPage(): ReactElement {
         </select>
 
         <label htmlFor="method-provider">Provider</label>
-        <input
+        <select
           id="method-provider"
-          value={provider}
-          placeholder="anthropic"
+          value={selected}
+          disabled={providers.isPending}
           onChange={(event) => setProvider(event.target.value)}
-          required
-        />
+        >
+          <option value="">
+            {providers.isPending ? "Loading providers…" : "Choose a provider"}
+          </option>
+          {candidates.map((entry) => (
+            <option key={entry.id} value={entry.id}>
+              {entry.name}
+            </option>
+          ))}
+        </select>
+        {providers.status === "error" ? (
+          <p className="error" role="alert">
+            {providers.error.message}
+          </p>
+        ) : null}
+        {chosen === undefined ? null : (
+          <p className="muted">Stored as: {authNameOf(chosen, type)}</p>
+        )}
+        {candidates.length === 0 && providers.status === "success" ? (
+          <p className="muted">No provider offers this kind of auth.</p>
+        ) : null}
 
         <label htmlFor="method-label">Label (optional)</label>
         <input
           id="method-label"
           value={label}
-          placeholder="defaults to the provider"
+          placeholder="defaults to the provider id"
           onChange={(event) => setLabel(event.target.value)}
         />
 
@@ -143,7 +177,11 @@ export function AuthMethodsPage(): ReactElement {
         )}
 
         <div>
-          <button type="submit" className="button primary" disabled={create.isPending}>
+          <button
+            type="submit"
+            className="button primary"
+            disabled={create.isPending || selected === ""}
+          >
             {create.isPending ? "Adding…" : "Add"}
           </button>
         </div>

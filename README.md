@@ -73,6 +73,22 @@ Every route requires a bearer token except `POST /login`, and every route is sco
 
 `POST /login` verifies the secret against its stored hash and reconstructs the bearer token, which is why the secret must not contain `_` (see `docs/architecture/adrs/0005-user-authentication.md`).
 
+### Catalogue
+
+| Method | Path under `/api` | Notes |
+|---|---|---|
+| `GET` | `/providers` | Every provider Pi knows, with the auth each accepts and how many models it offers |
+| `GET` | `/providers/:id/models` | One provider's chat models with context window, output limit, and price per million tokens. `404` for an unknown provider |
+
+The catalogue is built from the same `Models` collection a harness uses, plus anything
+`NEXUS_PROVIDERS_MODULE` registers. That shared origin is what makes it authoritative: a provider or
+model it does not list is one a harness could not resolve either — it would fail the generation with
+`getModel` returning nothing. Naming one is therefore refused at the API, where the error can be
+specific, instead of mid-turn.
+
+An auth method may only name a known provider, and only for an auth type that provider accepts. A
+session may only name a known model of a known provider.
+
 ### Projects
 
 | Method | Path under `/api` | Notes |

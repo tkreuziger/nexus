@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { API_PREFIX } from "@nexus/client";
+import { ModelCatalog } from "../../src/catalog.ts";
 import type { Config } from "../../src/config.ts";
 import { loadOrCreateKey } from "../../src/crypto/secrets.ts";
 import { createApp } from "../../src/server/app.ts";
@@ -55,6 +56,7 @@ const boot = async (base: string, dir: string | null): Promise<void> => {
     config,
     supervisor: new SessionSupervisor(db, config, secretKey),
     secretKey,
+    catalog: new ModelCatalog(),
   });
 };
 

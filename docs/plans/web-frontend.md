@@ -16,6 +16,14 @@ Implementation plan for a browser frontend over the session server, structured s
 
 Four bugs were found by verifying against a running system rather than by testing, and each is now pinned by a test: Bun closing idle event streams after ten seconds, a crashed session keeping its streams open forever, the abort button reading a polled status that lags a turn, and `fetch` called with the wrong receiver (which only a browser rejects).
 
+## Beyond the plan
+
+Selecting a provider and a model used to mean typing `provider` and `provider:modelId` from memory. The
+server now derives both lists from Pi's own collection (`src/catalog.ts`) and validates what a request
+names, so the web app offers a provider dropdown and a provider-then-model cascade instead of free
+text. That is the same collection a harness resolves against, so anything the catalogue omits would
+have failed mid-turn anyway. 191 tests pass.
+
 ## Context
 
 The server (`docs/plans/pi-session-server.md`, complete) exposes a bearer-authenticated HTTP API and a per-session server-sent event stream. It has no browser-facing surface: no login route, no CORS headers, no static file serving. The frontend is a **test harness for the server** first and a product surface second, so it should exercise every route rather than a convenient subset.
