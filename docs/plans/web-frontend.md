@@ -24,6 +24,14 @@ names, so the web app offers a provider dropdown and a provider-then-model casca
 text. That is the same collection a harness resolves against, so anything the catalogue omits would
 have failed mid-turn anyway. 191 tests pass.
 
+The project frame also moved on. A project owns a sidebar of sections — git, files, sessions, settings
+— with the project itself as the first entry, so the overview is named by the project instead of by a
+label that reads the same on every one of them. A phone cannot spare a 190px column for that
+navigation, so below 720px the sidebar leaves the grid and becomes a drawer over the section: the
+hamburger in the project bar opens it, and the section link that was used, Escape, or the scrim behind
+it closes it. Hidden rather than merely translated off-canvas, so its links stay out of the tab order
+while it is closed.
+
 The files view was a plain `<pre>` of the whole file. It is now a read-only Monaco editor (bundled
 locally, loaded in its own chunk on first open) beside the directory navigator, plus a
 content search. Search is a new read-only route, `GET /projects/:id/search?q=&limit=`, backed by

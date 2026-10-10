@@ -57,6 +57,7 @@ On the first run the server creates a user `owner` and prints a bearer token **o
 | `NEXUS_COMPACTION_RESERVE_TOKENS` | `16384` | Context headroom before a compaction is forced |
 | `NEXUS_COMPACTION_KEEP_RECENT_TOKENS` | `20000` | Roughly how much recent context stays verbatim |
 | `NEXUS_PROVIDERS_MODULE` | — | Module whose default export registers extra model providers; used for offline runs and tests |
+| `NEXUS_SKILLS_DIR` | — | Extra skill roots, `:`-separated, added to the Pi locations skills are discovered from |
 
 ## HTTP API
 
@@ -160,6 +161,21 @@ A request handler never blocks the read loop, because the credential proxy issue
 - The harness never receives credentials at spawn time. It implements Pi Durable's `CredentialStore` and proxies each call to the server, which decrypts on read and re-encrypts on write. OAuth refreshes therefore persist, and plaintext exists only inside the harness process (`docs/architecture/adrs/0002-credential-injection.md`).
 - A session may only see its project's assigned auth method, and only for the matching provider.
 
+## Skills
+
+Every session's agent discovers [Pi skills](https://agentskills.io/specification) from the locations `pi` itself uses, so a skill installed for the CLI is available to a session without copying it:
+
+- `~/.pi/agent/skills/` — the global root; `PI_CODING_AGENT_DIR` moves the agent directory it sits in
+- `~/.agents/skills/` — the shared convention, so skills installed for other harnesses work too
+- `<worktree>/.pi/skills/` and `<worktree>/.agents/skills/` — the session's worktree, so a project's committed skills travel with the branch it was created from
+- every root named in `NEXUS_SKILLS_DIR` (`:`-separated)
+
+Discovery, validation, and the prompt block are Pi's own loader, `@earendil-works/pi-coding-agent` (see `docs/architecture/adrs/0010-skills.md`). Only names and descriptions enter the system prompt; the model loads a skill's body through `read` when a task matches its description, exactly as `pi` does. The section is rendered before every request, so a skill added to a root is advertised on the next turn without restarting the session.
+
+The loader reports malformed skills on the harness's stderr (`journalctl -u nexus`) and skips them — a skill without a `description` is never advertised.
+
+A skill is instructions the model will follow and may include code it runs. Review skill content before installing it; a project's committed skills are exactly as trustworthy as the repository.
+
 ## Worktree layout
 
 ```
@@ -201,6 +217,35 @@ NEXUS_WEB_DIR=apps/web/dist bun run src/server/main.ts
 Log in with the `owner` handle and the secret behind the bootstrap token. `@nexus/client` holds the wire contract the server and every frontend share, so a breaking change fails `tsc` rather than reaching a browser.
 
 A web manifest and icons ship with the app, so it can be added to a home screen with a name, an icon, and a standalone window. Installing it as an app additionally needs a service worker, which does not exist yet — that is the next step for the PWA path, not a missing piece of this one.
+
+## Deploy
+
+`deploy/nexus.service` (systemd; runs as root, because a project is a folder on the host and each session's harness tools are scoped to that folder's worktree) and `deploy/apache/` (the vhost pair: port 80 redirects, port 443 terminates TLS and proxies to the loopback server). Edit the paths for your host, then:
+
+```sh
+bun install
+bun run web:build              # apps/web/dist — served live, no restart needed
+install -m 0644 deploy/nexus.service /etc/systemd/system/nexus.service
+systemctl daemon-reload && systemctl enable --now nexus
+
+install -m 0644 deploy/apache/nexus.conf /etc/apache2/sites-available/nexus.conf
+a2ensite nexus && apache2ctl configtest && systemctl reload apache2
+certbot --apache -d nexus.tristech.de --redirect   # writes nexus-le-ssl.conf
+
+# certbot's vhost, plus the proxy block: swap in the copy that carries it.
+install -m 0644 deploy/apache/nexus-le-ssl.conf /etc/apache2/sites-available/nexus-le-ssl.conf
+apache2ctl configtest && systemctl reload apache2
+```
+
+Three things the unit settles that are easy to get wrong:
+
+- **State outside the checkout.** `NEXUS_DATA_DIR=/var/lib/nexus` holds the server SQLite, the AES key and every session's Pi storage; `NEXUS_PROJECTS_ROOT=/root/nexus-projects` holds worktrees. A re-clone or a rebuild must not be able to destroy either.
+- **The first boot prints the credential.** With `NEXUS_BOOTSTRAP_TOKEN` unset the server creates user `owner` with a random secret and logs the bearer token once — `journalctl -u nexus | grep -A1 'bearer token'`. The login form wants the *secret* (the last `_`-separated part); the curl and the web client want the whole token.
+- **`flushpackets=on` is what makes the vhost stream.** Without it `mod_proxy_http` buffers, and `GET /api/sessions/:id/events` arrives in one lump when the turn ends instead of incrementally — the web app's live view then looks broken while the API is fine. `ProxyTimeout` is set well above the stream's 20s heartbeat.
+
+The unit's `WorkingDirectory` is the checkout itself, and the two halves reload differently: the server reads its own sources once at start, so a change under `src/` or `packages/` needs `systemctl restart nexus`, while `NEXUS_WEB_DIR` is re-read from disk on every request, so `bun run web:build` is live on the next page load with no restart at all. That asymmetry is the trap — a rebuilt bundle against an unrestarted server pairs a fresh client with a stale API. (A browser may also still hold the previous `index.html`; the hashed asset names change, so a reload is enough.)
+
+For iteration, `bun run dev` (server with `--watch`) and `bun run web:dev` (Vite on 5173, proxying `/api`) are the fast path. Stop `nexus.service` first or point `NEXUS_LISTEN` at another port: a dev run inherits no `NEXUS_*` from the unit, so it would also default to `~/.nexus` and `~/nexus-projects` rather than the deployed state.
 
 ## Development
 

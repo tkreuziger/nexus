@@ -9,6 +9,8 @@ export function ProjectOverviewPage(): ReactElement {
   const { id = "" } = useParams();
   const [creating, setCreating] = useState(false);
 
+  // The layout already read the project, so this is the same cached entry rather than a second call.
+  const project = useQuery({ queryKey: ["project", id], queryFn: () => api.getProject(id) });
   const sessions = useQuery({
     queryKey: ["sessions", id],
     queryFn: () => api.listSessions(id),
@@ -27,7 +29,9 @@ export function ProjectOverviewPage(): ReactElement {
   return (
     <section className="stack-lg">
       <div className="row">
-        <h1 className="grow">Overview</h1>
+        <h1 className="grow">
+          {project.status === "success" ? project.data.project.name : "Project"}
+        </h1>
         <button type="button" className="button primary" onClick={() => setCreating(true)}>
           New session
         </button>

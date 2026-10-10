@@ -12,6 +12,9 @@
   --success: #1f6f43;
   --radius: 6px;
   --gap: 16px;
+  /* One code font for every monospace surface: tool output, thinking, and fenced code. */
+  --font-mono:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -64,7 +67,7 @@ a {
 }
 
 .mono {
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
 }
 
@@ -75,10 +78,19 @@ a {
 
 /* Layout */
 
+/* The frame fills the viewport, and only what sits between the bars scrolls. */
 .app {
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+
+/* Dynamic viewport units keep the frame honest under a mobile browser's collapsing toolbars. */
+@supports (height: 100dvh) {
+  .app {
+    height: 100dvh;
+  }
 }
 
 .topbar {
@@ -123,12 +135,32 @@ a {
   background: var(--bg);
 }
 
+/* The scroll area under the topbar. Pages other than the conversation sit in a centered, padded
+   column inside it, so the scrollbar stays at the edge of the viewport rather than of the column. */
 .main {
   flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow-y: auto;
+}
+
+.page {
   width: 100%;
   max-width: 1080px;
   margin: 0 auto;
   padding: 24px 20px 48px;
+}
+
+/* The conversation runs its own header, transcript, and composer and scrolls internally, so it
+   drops the page column and the outer scroll area stops scrolling. */
+.main.flush {
+  overflow: hidden;
+}
+
+.page.flush {
+  height: 100%;
+  max-width: none;
+  padding: 0;
 }
 
 /* Cards and lists */
@@ -247,6 +279,111 @@ a {
   border-color: var(--error);
 }
 
+/* Conversation: a fixed header, a scrolling transcript, and a pinned composer. */
+
+.chat {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-head,
+.chat-foot {
+  flex: 0 0 auto;
+  background: var(--bg);
+}
+
+.chat-head {
+  border-bottom: 1px solid var(--border);
+}
+
+.chat-foot {
+  border-top: 1px solid var(--border);
+}
+
+/* One measure for the header, the transcript, and the composer, so they line up as one column. */
+.chat-col {
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 12px 16px;
+}
+
+.chat-head-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-block: 10px;
+}
+
+.chat-foot-col {
+  position: relative;
+  padding-block: 10px;
+}
+
+.chat-back {
+  margin: 0;
+  font-size: 13px;
+}
+
+.chat-title {
+  margin: 0;
+  font-size: 18px;
+}
+
+.chat-meta {
+  margin: 0;
+}
+
+/* A row here so the notice costs one line in the header instead of three. */
+.chat-notice {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
+.chat-notice p {
+  margin: 0;
+}
+
+.chat-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.chat-transcript {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-block: 14px 20px;
+}
+
+/* Sits just above the composer, aligned to the same column. */
+.jump-bottom {
+  position: absolute;
+  right: 16px;
+  bottom: calc(100% + 10px);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--fg);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.18);
+}
+
+.jump-bottom:hover {
+  border-color: var(--muted);
+}
+
 /* Transcript */
 
 .transcript {
@@ -274,6 +411,20 @@ a {
   margin-bottom: 4px;
 }
 
+/* A tool result folds away, so the transcript stays scannable. */
+.msg-tool {
+  padding: 8px 12px;
+}
+
+.tool-summary {
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.tool-output {
+  margin-top: 8px;
+}
+
 .msg-text {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -284,7 +435,7 @@ a {
   padding: 8px 10px;
   border-left: 2px solid var(--border);
   color: var(--muted);
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -295,21 +446,81 @@ a {
   padding: 4px 0;
   color: var(--muted);
   font-size: 13px;
-  text-align: center;
 }
 
 .tool summary {
   cursor: pointer;
 }
 
-.composer textarea {
+/* The composer's height is set in JS as the draft grows, up to a fifth of the viewport. The same cap
+   lives here so a window resize cannot leave a stale pixel height behind. */
+.composer-input {
   font: inherit;
   padding: 8px 10px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--fg);
-  resize: vertical;
+  resize: none;
+  max-height: 20vh;
+  overflow-y: auto;
+}
+
+/* The prompt box and its corner control. The right padding keeps the first lines clear of the icon. */
+.composer-field {
+  position: relative;
+  display: flex;
+}
+
+.composer-field .composer-input {
+  flex: 1;
+  min-width: 0;
+  padding-right: 30px;
+}
+
+.composer-expand {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.composer-expand:hover {
+  color: var(--fg);
+  background: var(--surface);
+}
+
+.composer-expand svg {
+  display: block;
+}
+
+/* The send shortcut, drawn as key caps instead of spelled-out words. */
+.send-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.send-hint kbd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 5px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--fg);
 }
 
 /* Project frame: a sidebar of sections beside the section itself. */
@@ -321,22 +532,19 @@ a {
   align-items: start;
 }
 
+/* The sidebar keeps its column on a wide viewport, so the bar that opens it and the scrim that
+   closes it are only real below the drawer width. */
+.project-bar,
+.sidebar-scrim {
+  display: none;
+}
+
 .sidebar {
   position: sticky;
   top: 20px;
   display: flex;
   flex-direction: column;
   gap: 14px;
-}
-
-.sidebar-head {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.sidebar-title {
-  font-weight: 500;
 }
 
 .sidebar-path {
@@ -402,6 +610,27 @@ a {
   margin-bottom: 14px;
 }
 
+/* The prompt's pop-out: as close to the full viewport as a dialog can be and still keep its margins. */
+.modal-large {
+  width: min(1200px, calc(100vw - 32px));
+  height: calc(100vh - 32px);
+  max-height: calc(100vh - 32px);
+}
+
+.prompt-modal {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Fills the dialog rather than growing to a cap, so the whole box is the writing surface. */
+.composer-input-large {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+
 .crumbs {
   display: flex;
   flex-wrap: wrap;
@@ -453,7 +682,7 @@ a {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
   white-space: pre-wrap;
   word-break: break-word;
@@ -670,24 +899,74 @@ input {
   white-space: nowrap;
 }
 
-/* Below a tablet width the sidebar stacks above the section, so its nav runs across. */
+/* Below the drawer width the sidebar leaves the grid and slides in over the section, so the section
+   keeps the full width and the hamburger in the project bar is what reaches the sections. */
 @media (max-width: 720px) {
   .project {
     grid-template-columns: minmax(0, 1fr);
     gap: 16px;
   }
 
-  .sidebar {
-    position: static;
-    /* The nav runs across here, so a rule keeps it distinct from the section below it. */
-    padding-bottom: 10px;
-    border-bottom: 1px solid var(--border);
+  .project-bar {
+    display: flex;
   }
 
-  .sidebar-nav {
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 4px;
+  .sidebar-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 20;
+    width: min(80vw, 280px);
+    padding: 16px;
+    overflow-y: auto;
+    background: var(--bg);
+    border-right: 1px solid var(--border);
+    /* Hidden rather than merely off-canvas: a translated box still holds its links in the tab order. */
+    visibility: hidden;
+    transform: translateX(-100%);
+    transition:
+      transform 0.2s ease,
+      visibility 0s 0.2s;
+  }
+
+  .sidebar[data-open="true"] {
+    visibility: visible;
+    transform: none;
+    transition: transform 0.2s ease;
+  }
+
+  .sidebar-nav a {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  .sidebar-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 15;
+    padding: 0;
+    border: 0;
+    background: rgb(0 0 0 / 0.45);
+  }
+
+  /* The drawer covers the section, so the section must not scroll underneath it. The app shell is a
+     fixed frame, so the scroll container is `.main` and locking the document alone is not enough. */
+  body:has(.sidebar-scrim) {
+    overflow: hidden;
+  }
+
+  body:has(.sidebar-scrim) .main {
+    overflow: hidden;
   }
 
   .files-split {
@@ -696,6 +975,14 @@ input {
 
   .files-tree {
     max-height: 260px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The open state is a more specific selector, so it has to be named to lose its transition too. */
+  .sidebar,
+  .sidebar[data-open="true"] {
+    transition: none;
   }
 }
 
@@ -716,7 +1003,7 @@ input {
     width: 100%;
   }
 
-  .main {
+  .page {
     padding: 16px 12px 40px;
   }
 
@@ -732,5 +1019,179 @@ input {
 
   .facts dd {
     margin-bottom: 6px;
+  }
+}
+
+/* Syntax highlighting.
+   highlight.js ships a theme per colour scheme as a separate stylesheet. Mapping its token classes
+   onto the palette above instead means one rule set covers light and dark, because every variable
+   those rules read is already redefined for dark. */
+
+.hljs-comment,
+.hljs-quote {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-doctag,
+.hljs-name {
+  color: var(--accent);
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-addition {
+  color: var(--success);
+}
+
+.hljs-number,
+.hljs-built_in,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-attr,
+.hljs-attribute,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-meta {
+  color: var(--warning);
+}
+
+.hljs-title,
+.hljs-section {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.hljs-deletion {
+  color: var(--error);
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: 600;
+}
+
+/* Markdown in a message. Only what an agent actually emits is styled; the browser defaults for the
+   rest are close enough that styling them would be noise. */
+
+.markdown {
+  overflow-wrap: anywhere;
+}
+
+.markdown > :first-child {
+  margin-top: 0;
+}
+
+.markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown p,
+.markdown ul,
+.markdown ol,
+.markdown blockquote,
+.markdown pre,
+.markdown table {
+  margin: 0 0 10px;
+}
+
+.markdown ul,
+.markdown ol {
+  padding-left: 22px;
+}
+
+.markdown li {
+  margin: 2px 0;
+}
+
+.markdown h1,
+.markdown h2,
+.markdown h3,
+.markdown h4,
+.markdown h5,
+.markdown h6 {
+  margin: 16px 0 8px;
+  line-height: 1.3;
+}
+
+.markdown h1 {
+  font-size: 19px;
+}
+
+.markdown h2 {
+  font-size: 17px;
+}
+
+.markdown h3 {
+  font-size: 15px;
+}
+
+.markdown h4,
+.markdown h5,
+.markdown h6 {
+  font-size: 14px;
+}
+
+.markdown blockquote {
+  padding-left: 10px;
+  border-left: 2px solid var(--border);
+  color: var(--muted);
+}
+
+.markdown hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 14px 0;
+}
+
+.markdown table {
+  border-collapse: collapse;
+}
+
+.markdown th,
+.markdown td {
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  text-align: left;
+}
+
+.markdown code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 1px 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+}
+
+/* A fenced block already carries the `.code` frame, so the inline treatment is undone inside it. */
+.markdown pre > code {
+  display: block;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+
+/* Sending is ⌘/Ctrl+Enter on a keyboard. Where the primary pointer is a finger there is no such key,
+   so the shortcut hint gives way to a button: on narrow screens, and on touch devices of any width
+   — an iPad in portrait is 768px and would otherwise be stuck unable to send. */
+.send-touch {
+  display: none;
+}
+
+@media (max-width: 720px), (pointer: coarse) {
+  .send-touch {
+    display: inline-block;
+  }
+
+  .send-hint {
+    display: none;
   }
 }

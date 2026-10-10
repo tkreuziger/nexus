@@ -1,7 +1,7 @@
 import { ApiError } from "@nexus/client";
 import { QueryCache, QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { type ReactElement, useCallback, useEffect, useRef, useState } from "react";
-import { Navigate, NavLink, Route, Routes } from "react-router-dom";
+import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { api, setToken } from "./api.ts";
 import { ProjectLayout } from "./layouts/ProjectLayout.tsx";
 import { AuthMethodsPage } from "./pages/AuthMethodsPage.tsx";
@@ -62,6 +62,10 @@ export function App(): ReactElement {
 
 function AppShell({ onSignOut }: { onSignOut: () => void }): ReactElement {
   const me = useQuery({ queryKey: ["me"], queryFn: () => api.me() });
+  const { pathname } = useLocation();
+  // The conversation runs its own header, transcript, and composer and scrolls internally, so it
+  // takes the viewport instead of the padded column every other page sits in.
+  const flush = pathname.startsWith("/sessions/");
 
   return (
     <div className="app">
@@ -80,20 +84,22 @@ function AppShell({ onSignOut }: { onSignOut: () => void }): ReactElement {
           </button>
         </div>
       </header>
-      <main className="main">
-        <Routes>
-          <Route path="/" element={<ProjectsPage />} />
-          <Route path="/auth-methods" element={<AuthMethodsPage />} />
-          <Route path="/projects/:id" element={<ProjectLayout />}>
-            <Route index element={<ProjectOverviewPage />} />
-            <Route path="git" element={<ProjectGitPage />} />
-            <Route path="files" element={<ProjectFilesPage />} />
-            <Route path="sessions" element={<SessionsPage />} />
-            <Route path="settings" element={<ProjectSettingsPage />} />
-          </Route>
-          <Route path="/sessions/:id" element={<SessionViewPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+      <main className={flush ? "main flush" : "main"}>
+        <div className={flush ? "page flush" : "page"}>
+          <Routes>
+            <Route path="/" element={<ProjectsPage />} />
+            <Route path="/auth-methods" element={<AuthMethodsPage />} />
+            <Route path="/projects/:id" element={<ProjectLayout />}>
+              <Route index element={<ProjectOverviewPage />} />
+              <Route path="git" element={<ProjectGitPage />} />
+              <Route path="files" element={<ProjectFilesPage />} />
+              <Route path="sessions" element={<SessionsPage />} />
+              <Route path="settings" element={<ProjectSettingsPage />} />
+            </Route>
+            <Route path="/sessions/:id" element={<SessionViewPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </div>
       </main>
     </div>
   );

@@ -1,0 +1,34 @@
+[Unit]
+Description=nexus — durable agent session control plane (projects, sessions, conversations)
+Documentation=file:///root/code/nexus/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Runs as root on purpose: a project is a folder on this host (often under /root),
+# and each session spawns a harness process whose tools are scoped to that folder's
+# worktree. Reach it only through the Apache vhost, which terminates TLS; the
+# bearer token is the gate on the API.
+User=root
+WorkingDirectory=/root/code/nexus
+
+# State lives outside the checkout so a rebuild or re-clone cannot destroy projects,
+# transcripts or the credential key.
+Environment=NEXUS_DATA_DIR=/var/lib/nexus
+Environment=NEXUS_PROJECTS_ROOT=/root/nexus-projects
+Environment=NEXUS_LISTEN=127.0.0.1:8787
+Environment=NEXUS_WEB_DIR=/root/code/nexus/apps/web/dist
+
+# systemd's PATH is minimal; sessions shell out to git and to the host's bun, and the
+# harness is spawned with this process's environment.
+Environment=PATH=/root/.local/share/pi-node/current/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# NEXUS_BOOTSTRAP_TOKEN is deliberately unset: the first boot creates user "owner"
+# with a random secret and prints the bearer token once, to the journal.
+ExecStart=/root/.local/share/pi-node/current/bin/bun run src/server/main.ts
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
