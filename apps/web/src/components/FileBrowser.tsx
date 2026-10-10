@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { type ReactElement, useState } from "react";
 import { api } from "../api.ts";
+import { CodeBlock } from "../components/CodeBlock.tsx";
 import { formatBytes } from "../format.ts";
+import { languageFromPath } from "../highlight.ts";
 
 const parentOf = (path: string): string => {
   const cut = path.lastIndexOf("/");
@@ -90,7 +92,7 @@ export function FileBrowser({ projectId }: { projectId: string }): ReactElement 
       {content.status === "success" && content.data.content.kind === "file" ? (
         <>
           <p className="muted">{formatBytes(content.data.content.size)}</p>
-          <pre className="code">{content.data.content.text}</pre>
+          <CodeBlock text={content.data.content.text} language={languageFromPath(file ?? "")} />
           <div>
             <button
               type="button"

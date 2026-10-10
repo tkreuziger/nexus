@@ -8,11 +8,13 @@ export function Modal({
   open,
   title,
   onClose,
+  size = "default",
   children,
 }: {
   open: boolean;
   title: string;
   onClose: () => void;
+  size?: "default" | "large";
   children: ReactNode;
 }): ReactElement {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -40,7 +42,11 @@ export function Modal({
   }, [onClose]);
 
   return (
-    <dialog ref={dialog} className="modal" aria-labelledby={titleId}>
+    <dialog
+      ref={dialog}
+      className={size === "large" ? "modal modal-large" : "modal"}
+      aria-labelledby={titleId}
+    >
       <div className="modal-head">
         <h2 className="section-title grow" id={titleId}>
           {title}
