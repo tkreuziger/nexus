@@ -24,6 +24,21 @@ names, so the web app offers a provider dropdown and a provider-then-model casca
 text. That is the same collection a harness resolves against, so anything the catalogue omits would
 have failed mid-turn anyway. 191 tests pass.
 
+The files view was a plain `<pre>` of the whole file. It is now a read-only Monaco editor (bundled
+locally, loaded in its own chunk on first open) beside the directory navigator, plus a
+content search. Search is a new read-only route, `GET /projects/:id/search?q=&limit=`, backed by
+`src/projects/search.ts`: it walks the project root case-insensitively, skips `.git`, `node_modules`,
+binaries, and files over 1 MiB, never follows symlinks, and caps matches with a `truncated` flag. A
+match opens its file and highlights the line.
+
+Registering a project meant typing an absolute path from memory. The path field now autocompletes from
+`GET /fs/list?path=`, a read-only directory listing (`src/fs.ts`) that marks which children are
+repositories. The dialog asks for the parent directory of what has been typed, so suggestions stay
+local to the current segment; `~` and an empty value resolve to the server's home. The suggestions are
+an explicit listbox rendered in the DOM — a native `<datalist>` popup is browser chrome that cannot be
+styled, screenshotted, or relied on to appear. Choosing a directory descends into it; choosing a
+repository completes the path.
+
 ## Context
 
 The server (`docs/plans/pi-session-server.md`, complete) exposes a bearer-authenticated HTTP API and a per-session server-sent event stream. It has no browser-facing surface: no login route, no CORS headers, no static file serving. The frontend is a **test harness for the server** first and a product surface second, so it should exercise every route rather than a convenient subset.

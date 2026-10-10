@@ -89,6 +89,16 @@ specific, instead of mid-turn.
 An auth method may only name a known provider, and only for an auth type that provider accepts. A
 session may only name a known model of a known provider.
 
+### Filesystem
+
+| Method | Path under `/api` | Notes |
+|---|---|---|
+| `GET` | `/fs/list?path=&limit=` | The immediate subdirectories of `path`, each with a `git` flag; `path` defaults to the server's home directory and a leading `~` expands to it. `422` when `path` is not a directory; `limit` defaults to 200 (max 500) |
+
+This exists only to autocomplete the path field when registering a project. It is read-only and, unlike
+the project and session routes, not owner-scoped: registering already accepts any path on the server's
+filesystem, so listing directory names grants no new capability.
+
 ### Projects
 
 | Method | Path under `/api` | Notes |
@@ -97,6 +107,7 @@ session may only name a known model of a known provider.
 | `GET` | `/projects` | The caller's projects |
 | `GET` | `/projects/:id` | Project metadata |
 | `GET` | `/projects/:id/content?path=` | Read-only listing or file text. `400` when the path escapes the project root |
+| `GET` | `/projects/:id/search?q=&limit=` | Read-only case-insensitive content search. Skips `.git`, `node_modules`, binaries, and files over 1 MiB; symlinks are not followed. `limit` defaults to 100 (max 500); `truncated` marks a capped result. `400` when `q` is empty |
 | `GET` | `/projects/:id/git/status` | Branch, dirty files, ahead/behind |
 | `GET` | `/projects/:id/git/log?limit=` | Recent commits |
 | `GET` | `/projects/:id/git/worktrees` | Linked worktrees |
