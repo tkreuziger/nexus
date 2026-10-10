@@ -36,6 +36,8 @@ export interface WireProject {
   name: string;
   path: string;
   assignedAuthMethodId: string | null;
+  /** The model a new session defaults to when the request does not name one. */
+  defaultModel: WireModelRef | null;
   createdAt: string;
 }
 
@@ -170,6 +172,10 @@ export type CreateAuthMethodRequest = ApiKeyCredentialInput | OAuthCredentialInp
 
 export interface AssignAuthMethodRequest {
   authMethodId: string | null;
+}
+
+export interface AssignDefaultModelRequest {
+  model: WireModelRef | null;
 }
 
 export interface CreateSessionRequest {

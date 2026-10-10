@@ -31,6 +31,8 @@ export interface Project {
   name: string;
   path: string;
   assignedAuthMethodId: AuthMethodId | null;
+  /** The model a new session defaults to when the request does not name one. */
+  defaultModel: ModelRef | null;
   createdAt: string;
 }
 

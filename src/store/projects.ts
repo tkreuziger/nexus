@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import type { AuthMethodId, Project, ProjectId, UserId } from "../types.ts";
+import type { AuthMethodId, ModelRef, Project, ProjectId, UserId } from "../types.ts";
 
 interface ProjectRow {
   id: string;
@@ -7,6 +7,8 @@ interface ProjectRow {
   name: string;
   path: string;
   assigned_auth_method_id: string | null;
+  default_model_provider: string | null;
+  default_model_id: string | null;
   created_at: string;
 }
 
@@ -16,6 +18,10 @@ const toProject = (row: ProjectRow): Project => ({
   name: row.name,
   path: row.path,
   assignedAuthMethodId: row.assigned_auth_method_id as AuthMethodId | null,
+  defaultModel:
+    row.default_model_provider === null || row.default_model_id === null
+      ? null
+      : { provider: row.default_model_provider, modelId: row.default_model_id },
   createdAt: row.created_at,
 });
 
@@ -35,6 +41,7 @@ export function insertProject(
     name: input.name,
     path: input.path,
     assignedAuthMethodId: null,
+    defaultModel: null,
     createdAt,
   };
 }
@@ -67,4 +74,13 @@ export function findProjectByPath(db: Database, path: string): Project | undefin
 export function getProjectById(db: Database, id: ProjectId): Project | undefined {
   const row = db.query<ProjectRow, [string]>("SELECT * FROM projects WHERE id = ?").get(id);
   return row === null ? undefined : toProject(row);
+}
+
+/** Point a project at the model a new session defaults to; `null` clears it. */
+export function setProjectDefaultModel(db: Database, id: ProjectId, model: ModelRef | null): void {
+  db.query("UPDATE projects SET default_model_provider = ?, default_model_id = ? WHERE id = ?").run(
+    model?.provider ?? null,
+    model?.modelId ?? null,
+    id,
+  );
 }

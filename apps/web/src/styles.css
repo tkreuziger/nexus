@@ -105,6 +105,12 @@ a {
 .brand {
   font-weight: 600;
   letter-spacing: 0.01em;
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.brand:hover {
+  color: var(--accent);
 }
 
 .topbar-end {
@@ -114,25 +120,65 @@ a {
   gap: 12px;
 }
 
-.nav {
-  display: flex;
-  gap: 4px;
+/* Account control: an avatar button with a small menu behind it. */
+
+.user-menu {
+  position: relative;
 }
 
-.nav a {
-  padding: 4px 10px;
-  border-radius: var(--radius);
-  text-decoration: none;
-  color: var(--muted);
-}
-
-.nav a:hover {
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
   background: var(--bg);
-}
-
-.nav a[aria-current="page"] {
   color: var(--fg);
+  font: inherit;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.avatar:hover {
+  border-color: var(--muted);
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
   background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.18);
+}
+
+.menu-item {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.menu-item:hover {
+  background: var(--surface);
 }
 
 /* The scroll area under the topbar. Pages other than the conversation sit in a centered, padded
@@ -547,6 +593,10 @@ a {
   gap: 14px;
 }
 
+.sidebar-header {
+  font-weight: 600;
+}
+
 .sidebar-path {
   font-size: 12px;
   overflow-wrap: anywhere;
@@ -865,11 +915,6 @@ input {
 
   .topbar-end {
     gap: 8px;
-  }
-
-  .nav {
-    order: 3;
-    width: 100%;
   }
 
   .page {

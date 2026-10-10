@@ -50,7 +50,7 @@ On the first run the server creates a user `owner` and prints a bearer token **o
 | `NEXUS_PI_STORAGE_DIR` | `<dataDir>/sessions` | One Pi Durable SQLite file per session |
 | `NEXUS_LISTEN` | `127.0.0.1:8787` | `host:port` for `Bun.serve` |
 | `NEXUS_SECRET_KEY_FILE` | `<dataDir>/secret.key` | AES-256-GCM key, mode 0600, created on first run |
-| `NEXUS_DEFAULT_MODEL` | — | `provider:modelId` used when a session does not name one |
+| `NEXUS_DEFAULT_MODEL` | — | `provider:modelId` used when neither the session request nor the project's default names one |
 | `NEXUS_BOOTSTRAP_TOKEN` | random | Secret half of the first user's bearer token |
 | `NEXUS_WEB_DIR` | — | Directory holding the built web app; when set, unmatched `GET`s are served from it with an `index.html` fallback |
 | `NEXUS_SSE_HEARTBEAT_MS` | `20000` | Interval between `: keep-alive` comments on an event stream, which is what stops Bun closing an idle attachment |
@@ -102,6 +102,7 @@ session may only name a known model of a known provider.
 | `GET` | `/projects/:id/git/log?limit=` | Recent commits |
 | `GET` | `/projects/:id/git/worktrees` | Linked worktrees |
 | `PUT` | `/projects/:id/auth-method` | `{ authMethodId }` or `{ authMethodId: null }` to unassign |
+| `PUT` | `/projects/:id/default-model` | `{ model: { provider, modelId } }` or `{ model: null }` to clear. Validated against the catalogue; a new session defaults to it when the request names no model |
 
 ### Auth methods
 
@@ -117,7 +118,7 @@ A project with no assigned auth method refuses to start a session with `400`.
 
 | Method | Path under `/api` | Notes |
 |---|---|---|
-| `POST` | `/projects/:id/sessions` | `{ name, model?, baseRef? }` — creates the worktree and spawns the harness. `409` on a duplicate name, `400` without an auth method |
+| `POST` | `/projects/:id/sessions` | `{ name, model?, baseRef? }` — creates the worktree and spawns the harness. `409` on a duplicate name, `400` without an auth method. The model is the request's, else the project's default, else `NEXUS_DEFAULT_MODEL` |
 | `GET` | `/projects/:id/sessions` | Sessions in a project |
 | `GET` | `/sessions/:id` | Session metadata, including `status`, `pid`, `worktreePath`, `branch` |
 | `DELETE` | `/sessions/:id?force=` | Stops the process, removes the worktree, deletes the session's records; preserves the branch |

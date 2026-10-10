@@ -62,7 +62,7 @@ export function createApp(deps: AppDeps): (request: Request) => Promise<Response
   const routes: readonly Route[] = [
     ...loginRoutes,
     ...providerRoutes(deps),
-    ...projectRoutes,
+    ...projectRoutes(deps),
     ...authMethodRoutes(deps),
     ...sessionRoutes(deps),
   ];

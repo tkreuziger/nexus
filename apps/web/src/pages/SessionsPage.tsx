@@ -150,7 +150,12 @@ export function SessionsPage(): ReactElement {
         </p>
       ) : null}
 
-      <NewSessionDialog projectId={id} open={creating} onClose={() => setCreating(false)} />
+      <NewSessionDialog
+        projectId={id}
+        defaultModel={project.data?.project.defaultModel ?? null}
+        open={creating}
+        onClose={() => setCreating(false)}
+      />
     </section>
   );
 }
