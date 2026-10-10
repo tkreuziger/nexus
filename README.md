@@ -57,6 +57,7 @@ On the first run the server creates a user `owner` and prints a bearer token **o
 | `NEXUS_COMPACTION_RESERVE_TOKENS` | `16384` | Context headroom before a compaction is forced |
 | `NEXUS_COMPACTION_KEEP_RECENT_TOKENS` | `20000` | Roughly how much recent context stays verbatim |
 | `NEXUS_PROVIDERS_MODULE` | — | Module whose default export registers extra model providers; used for offline runs and tests |
+| `NEXUS_SKILLS_DIR` | — | Extra skill roots, `:`-separated, added to the Pi locations skills are discovered from |
 
 ## HTTP API
 
@@ -148,6 +149,21 @@ A request handler never blocks the read loop, because the credential proxy issue
 - An auth method is either an API key or an OAuth token set, sealed with AES-256-GCM under a 0600 key file (`docs/architecture/adrs/0003-credential-encryption.md`).
 - The harness never receives credentials at spawn time. It implements Pi Durable's `CredentialStore` and proxies each call to the server, which decrypts on read and re-encrypts on write. OAuth refreshes therefore persist, and plaintext exists only inside the harness process (`docs/architecture/adrs/0002-credential-injection.md`).
 - A session may only see its project's assigned auth method, and only for the matching provider.
+
+## Skills
+
+Every session's agent discovers [Pi skills](https://agentskills.io/specification) from the locations `pi` itself uses, so a skill installed for the CLI is available to a session without copying it:
+
+- `~/.pi/agent/skills/` — the global root; `PI_CODING_AGENT_DIR` moves the agent directory it sits in
+- `~/.agents/skills/` — the shared convention, so skills installed for other harnesses work too
+- `<worktree>/.pi/skills/` and `<worktree>/.agents/skills/` — the session's worktree, so a project's committed skills travel with the branch it was created from
+- every root named in `NEXUS_SKILLS_DIR` (`:`-separated)
+
+Discovery, validation, and the prompt block are Pi's own loader, `@earendil-works/pi-coding-agent` (see `docs/architecture/adrs/0010-skills.md`). Only names and descriptions enter the system prompt; the model loads a skill's body through `read` when a task matches its description, exactly as `pi` does. The section is rendered before every request, so a skill added to a root is advertised on the next turn without restarting the session.
+
+The loader reports malformed skills on the harness's stderr (`journalctl -u nexus`) and skips them — a skill without a `description` is never advertised.
+
+A skill is instructions the model will follow and may include code it runs. Review skill content before installing it; a project's committed skills are exactly as trustworthy as the repository.
 
 ## Worktree layout
 
