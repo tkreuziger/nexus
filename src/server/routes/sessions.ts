@@ -167,10 +167,11 @@ export function sessionRoutes(deps: SessionDeps): readonly Route[] {
     {
       method: "DELETE",
       path: "/sessions/:id",
-      handler: async (scope) => {
+      handler: async (scope, request) => {
         const session = requireOwnedSession(scope, deps);
-        await deps.supervisor.stop(session.id);
-        return json({ stopped: true, preservedBranch: session.branch });
+        const force = new URL(request.url).searchParams.get("force") === "true";
+        await deps.supervisor.remove(session.id, { force });
+        return json({ deleted: true, preservedBranch: session.branch });
       },
     },
     {

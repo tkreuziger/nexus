@@ -5,6 +5,8 @@ import type { ModelRef } from "./types.ts";
 /** Server configuration, read once at boot from the environment (§6.3). */
 export interface Config {
   projectsRoot: string;
+  /** Where session worktrees live; defaults to the projects root (`INPUT.md` §5.3). */
+  worktreesRoot: string;
   dataDir: string;
   piStorageDir: string;
   listen: { host: string; port: number };
@@ -36,8 +38,10 @@ function parseModel(value: string | undefined): ModelRef | null {
 /** Read configuration from `env`, applying defaults and validating the values that are present. */
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
   const dataDir = resolve(env.NEXUS_DATA_DIR ?? join(homedir(), ".nexus"));
+  const projectsRoot = resolve(env.NEXUS_PROJECTS_ROOT ?? join(homedir(), "nexus-projects"));
   return {
-    projectsRoot: resolve(env.NEXUS_PROJECTS_ROOT ?? join(homedir(), "nexus-projects")),
+    projectsRoot,
+    worktreesRoot: resolve(env.NEXUS_WORKTREES_ROOT ?? projectsRoot),
     dataDir,
     piStorageDir: resolve(env.NEXUS_PI_STORAGE_DIR ?? join(dataDir, "sessions")),
     listen: parseListen(env.NEXUS_LISTEN),
