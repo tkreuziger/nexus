@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { API_PREFIX } from "@nexus/client";
 import type { Config } from "../../src/config.ts";
 import { loadOrCreateKey } from "../../src/crypto/secrets.ts";
 import { createApp } from "../../src/server/app.ts";
@@ -18,12 +19,18 @@ let app: (request: Request) => Promise<Response>;
 let token: string;
 let webDir: string;
 
-const get = (path: string, bearer?: string) =>
+const request = (path: string, bearer?: string) =>
   app(
     new Request(`http://localhost${path}`, {
       headers: bearer === undefined ? {} : { authorization: `Bearer ${bearer}` },
     }),
   );
+
+/** A path the web app owns, served from the build output. */
+const webGet = (path: string) => request(path);
+
+/** A path under the API prefix. */
+const apiGet = (path: string, bearer?: string) => request(`${API_PREFIX}${path}`, bearer);
 
 const buildConfig = (base: string, dir: string | null): Config => ({
   projectsRoot: base,
@@ -62,35 +69,51 @@ beforeEach(async () => {
 
 describe("static web app", () => {
   test("serves index.html at the root", async () => {
-    const response = await get("/");
+    const response = await webGet("/");
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/html");
     expect(await response.text()).toBe(INDEX);
   });
 
   test("falls back to index.html so client-side routes deep-link", async () => {
-    const response = await get("/projects/abc/sessions/def");
+    const response = await webGet("/projects/abc/sessions/def");
     expect(response.status).toBe(200);
     expect(await response.text()).toBe(INDEX);
   });
 
+  test("serves a deep link that collides with an API path shape", async () => {
+    // `/projects/<name>` also matches the API route `GET /projects/:id`. A document navigation cannot
+    // carry a bearer token, so without the `/api` prefix this returned a 401 JSON body instead of the
+    // app — which is exactly what the prefix exists to prevent.
+    const response = await webGet("/projects/some-project");
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(INDEX);
+
+    const api = await apiGet("/projects");
+    expect(api.status).toBe(401);
+    expect(api.headers.get("content-type")).toContain("application/json");
+  });
+
   test("serves a real asset with its own content type", async () => {
-    const response = await get("/assets/app.js");
+    const response = await webGet("/assets/app.js");
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("javascript");
     expect(await response.text()).toBe(ASSET);
   });
 
-  test("never shadows the API", async () => {
-    const response = await get("/projects");
-    expect(response.status).toBe(401);
-    expect(response.headers.get("content-type")).toContain("application/json");
-    expect((await get("/projects", token)).status).toBe(200);
+  test("serves the API under its prefix and requires a token", async () => {
+    const anonymous = await apiGet("/projects");
+    expect(anonymous.status).toBe(401);
+    expect(anonymous.headers.get("content-type")).toContain("application/json");
+
+    const authorized = await apiGet("/projects", token);
+    expect(authorized.status).toBe(200);
+    expect(authorized.headers.get("content-type")).toContain("application/json");
   });
 
   test("refuses a traversal outside the web root", async () => {
     // Encoded dots survive URL normalization, so the traversal reaches the handler.
-    const response = await get("/%2e%2e%2f%2e%2e%2fetc%2fpasswd");
+    const response = await webGet("/%2e%2e%2f%2e%2e%2fetc%2fpasswd");
     expect(response.status).toBe(200);
     expect(await response.text()).toBe(INDEX);
   });
@@ -108,7 +131,7 @@ describe("static web app", () => {
 
   test("answers 404 as JSON when no web app is configured", async () => {
     await boot(mkdtempSync(join(tmpdir(), "nexus-noweb-")), null);
-    const response = await get("/projects/abc/sessions/def");
+    const response = await webGet("/projects/abc/sessions/def");
     expect(response.status).toBe(404);
     expect(response.headers.get("content-type")).toContain("application/json");
   });

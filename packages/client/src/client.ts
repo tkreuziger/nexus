@@ -1,13 +1,15 @@
 import { errorFromResponse } from "./errors.ts";
+import { defaultFetch, type FetchLike } from "./fetch.ts";
+import { API_PREFIX } from "./prefix.ts";
 import { SessionStream, type SessionStreamOptions } from "./stream.ts";
 import type * as wire from "./wire.ts";
 
 export interface ApiClientOptions {
-  /** Prefix for every request; `""` (the default) means same origin. */
+  /** Prefix for every request. Defaults to the server's API prefix, which is the same in every environment. */
   baseUrl?: string;
   token?: string | null;
   /** Injectable for tests. */
-  fetch?: typeof fetch;
+  fetch?: FetchLike;
 }
 
 /** Per-call options for the read routes; writes are short-lived and are not cancellable. */
@@ -21,12 +23,12 @@ export interface RequestOptions {
  */
 export class ApiClient {
   readonly #baseUrl: string;
-  readonly #fetch: typeof fetch;
+  readonly #fetch: FetchLike;
   #token: string | null;
 
   constructor(options: ApiClientOptions = {}) {
-    this.#baseUrl = options.baseUrl ?? "";
-    this.#fetch = options.fetch ?? globalThis.fetch;
+    this.#baseUrl = options.baseUrl ?? API_PREFIX;
+    this.#fetch = options.fetch ?? defaultFetch;
     this.#token = options.token ?? null;
   }
 

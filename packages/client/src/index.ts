@@ -7,5 +7,7 @@
 
 export * from "./client.ts";
 export * from "./errors.ts";
+export * from "./fetch.ts";
+export * from "./prefix.ts";
 export * from "./stream.ts";
 export * from "./wire.ts";

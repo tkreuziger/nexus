@@ -12,6 +12,13 @@ import { loginRoutes } from "./routes/session-auth.ts";
 import { sessionRoutes } from "./routes/sessions.ts";
 import { serveWebApp } from "./static.ts";
 
+/**
+ * Every API route lives under this prefix, so the web app can own the rest of the URL space. Without
+ * the split, a browser navigation to `/projects/<name>` matches `GET /projects/:id` and returns a 401
+ * JSON body instead of the app, because a document load cannot carry a bearer token.
+ */
+export const API_PREFIX = "/api";
+
 export interface AppDeps {
   db: Database;
   config: Config;
@@ -31,8 +38,8 @@ async function route(
   routes: readonly Route[],
   deps: AppDeps,
   request: Request,
+  pathname: string,
 ): Promise<Response | undefined> {
-  const { pathname } = new URL(request.url);
   for (const candidate of routes) {
     if (candidate.method !== request.method) continue;
     const match = matchPath(candidate.path, pathname);
@@ -56,13 +63,16 @@ export function createApp(deps: AppDeps): (request: Request) => Promise<Response
   ];
   return async (request) => {
     try {
-      const matched = await route(routes, deps, request);
-      if (matched !== undefined) return matched;
-      // The API is matched first, so the web app can never shadow a route.
+      const { pathname } = new URL(request.url);
+      if (pathname === API_PREFIX || pathname.startsWith(`${API_PREFIX}/`)) {
+        const relative = pathname.slice(API_PREFIX.length) || "/";
+        const matched = await route(routes, deps, request, relative);
+        return matched ?? errorResponse(404, `no route for ${request.method} ${pathname}`);
+      }
+      // Outside the API prefix the web app owns the URL space.
       if (deps.config.webDir !== null && request.method === "GET") {
         return await serveWebApp(deps.config.webDir, request);
       }
-      const { pathname } = new URL(request.url);
       return errorResponse(404, `no route for ${request.method} ${pathname}`);
     } catch (error) {
       if (error instanceof HttpError) return errorResponse(error.status, error.message);

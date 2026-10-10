@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { ApiClient, ApiError } from "@nexus/client";
+import { API_PREFIX, ApiClient, ApiError, type FetchLike } from "@nexus/client";
 
 interface Recorded {
   url: string;
@@ -12,7 +12,7 @@ const recorder = (respond: (url: string, init: RequestInit) => Response) => {
     const requestInit = init ?? {};
     calls.push({ url: input, init: requestInit });
     return respond(input, requestInit);
-  }) as unknown as typeof globalThis.fetch;
+  }) as unknown as FetchLike;
   return { calls, fetch: fakeFetch };
 };
 
@@ -73,7 +73,7 @@ describe("ApiClient", () => {
     );
     const client = new ApiClient({ fetch });
     await client.getProjectContent("p1", "src/a b.ts");
-    expect(calls[0]?.url).toBe("/projects/p1/content?path=src%2Fa+b.ts");
+    expect(calls[0]?.url).toBe(`${API_PREFIX}/projects/p1/content?path=src%2Fa+b.ts`);
   });
 
   test("sends force only when asked", async () => {
@@ -81,15 +81,15 @@ describe("ApiClient", () => {
     const client = new ApiClient({ fetch });
     await client.deleteSession("s1");
     await client.deleteSession("s1", { force: true });
-    expect(calls[0]?.url).toBe("/sessions/s1");
-    expect(calls[1]?.url).toBe("/sessions/s1?force=true");
+    expect(calls[0]?.url).toBe(`${API_PREFIX}/sessions/s1`);
+    expect(calls[1]?.url).toBe(`${API_PREFIX}/sessions/s1?force=true`);
   });
 
   test("encodes ids in the path", async () => {
     const { calls, fetch } = recorder(() => ok({ session: {} }));
     const client = new ApiClient({ fetch });
     await client.getSession("a/b");
-    expect(calls[0]?.url).toBe("/sessions/a%2Fb");
+    expect(calls[0]?.url).toBe(`${API_PREFIX}/sessions/a%2Fb`);
   });
 
   test("passes an abort signal through", async () => {
@@ -98,5 +98,23 @@ describe("ApiClient", () => {
     const controller = new AbortController();
     await client.listProjects({ signal: controller.signal });
     expect(calls[0]?.init.signal).toBe(controller.signal);
+  });
+
+  test("calls the global fetch with the global as its receiver", async () => {
+    // A browser's fetch throws "Illegal invocation" when invoked with any other receiver. Storing it
+    // in a field and calling it as a method does exactly that, and Bun tolerates it silently — so the
+    // mistake only ever appears in a browser unless it is pinned here.
+    const original = globalThis.fetch;
+    let receiver: unknown = "never called";
+    globalThis.fetch = function (this: unknown): Promise<Response> {
+      receiver = this;
+      return Promise.resolve(ok({ projects: [] }));
+    } as unknown as typeof globalThis.fetch;
+    try {
+      await new ApiClient().listProjects();
+    } finally {
+      globalThis.fetch = original;
+    }
+    expect(receiver === globalThis || receiver === undefined).toBe(true);
   });
 });

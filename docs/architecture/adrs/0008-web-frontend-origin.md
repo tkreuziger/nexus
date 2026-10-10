@@ -12,7 +12,9 @@ Three facts constrain the options:
 
 ## Decision
 
-**The web app is served from the same origin as the API.** In development, Vite proxies `/api` to the server; in production, the server serves the built app from `NEXUS_WEB_DIR`, falling back to `index.html` so client-side routes deep-link. API routes are matched first, so the app can never shadow them.
+**The API lives under `/api`; the web app owns every other path.** API routes are matched first within the prefix, and outside it the app is served from `NEXUS_WEB_DIR` with an `index.html` fallback so client-side routes deep-link.
+
+The prefix is not cosmetic. A browser navigation to `/projects/<name>` matches the API route `GET /projects/:id`, and a document load cannot carry an `Authorization` header, so without the split a deep link returned `401 {"error":…}` instead of the app. Keeping the two in separate URL spaces makes the collision impossible rather than merely unlikely.
 
 **Authentication is a bearer token obtained from `POST /login`**, which verifies a handle and secret against the stored argon2id hash and reconstructs `nx_<tokenId>_<secret>`. The browser keeps the token in `localStorage` and sends it on every request.
 

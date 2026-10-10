@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { API_PREFIX } from "@nexus/client";
 import type { Config } from "../../src/config.ts";
 import { loadOrCreateKey } from "../../src/crypto/secrets.ts";
 import { runGit } from "../../src/projects/git.ts";
@@ -33,7 +34,7 @@ const makeRepo = async (name: string): Promise<string> => {
 
 const call = (path: string, init: RequestInit = {}, bearer = token) =>
   app(
-    new Request(`http://localhost${path}`, {
+    new Request(`http://localhost${API_PREFIX}${path}`, {
       ...init,
       headers: {
         authorization: `Bearer ${bearer}`,
@@ -119,7 +120,7 @@ describe("project routes", () => {
   });
 
   test("rejects an unauthenticated request with 401", async () => {
-    const response = await app(new Request("http://localhost/projects"));
+    const response = await app(new Request(`http://localhost${API_PREFIX}/projects`));
     expect(response.status).toBe(401);
   });
 

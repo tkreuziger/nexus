@@ -7,8 +7,10 @@
   "scripts": {
     "start": "bun run src/server/main.ts",
     "dev": "bun run --watch src/server/main.ts",
+    "web:dev": "bun run --cwd apps/web dev",
+    "web:build": "bun run --cwd apps/web build",
     "test": "bun test",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p apps/web",
     "lint": "biome check .",
     "lint:fix": "biome check --write ."
   },

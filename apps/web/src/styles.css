@@ -1,0 +1,234 @@
+:root {
+  --bg: #ffffff;
+  --surface: #f6f6f8;
+  --border: #d8d8de;
+  --fg: #1a1a1c;
+  --muted: #6b6b74;
+  --accent: #2f5fd0;
+  --accent-fg: #ffffff;
+  --error: #b3261e;
+  --radius: 6px;
+  --gap: 16px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16161a;
+    --surface: #1e1e23;
+    --border: #33333c;
+    --fg: #e8e8ec;
+    --muted: #9a9aa5;
+    --accent: #6f9bf5;
+    --accent-fg: #10101a;
+    --error: #f2857c;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font:
+    15px / 1.5 ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+}
+
+h1 {
+  font-size: 20px;
+  margin: 0 0 var(--gap);
+}
+
+a {
+  color: var(--accent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 13px;
+}
+
+.error {
+  color: var(--error);
+  margin: 0;
+}
+
+/* Layout */
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.brand {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.topbar-end {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nav {
+  display: flex;
+  gap: 4px;
+}
+
+.nav a {
+  padding: 4px 10px;
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--muted);
+}
+
+.nav a:hover {
+  background: var(--bg);
+}
+
+.nav a[aria-current="page"] {
+  color: var(--fg);
+  background: var(--bg);
+}
+
+.main {
+  flex: 1;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px 20px 48px;
+}
+
+/* Cards and lists */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.row-title {
+  font-weight: 500;
+}
+
+/* Buttons */
+
+.button {
+  font: inherit;
+  padding: 6px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled) {
+  border-color: var(--muted);
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+
+.button.ghost {
+  background: transparent;
+}
+
+/* Login */
+
+.login {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.login-card h1 {
+  margin: 0 0 4px;
+}
+
+.login-card p {
+  margin: 0 0 8px;
+}
+
+.brand-large {
+  font-size: 22px;
+  letter-spacing: 0.01em;
+}
+
+label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+input {
+  font: inherit;
+  padding: 7px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.login-card .button {
+  margin-top: 8px;
+}

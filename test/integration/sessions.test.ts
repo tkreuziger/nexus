@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { API_PREFIX } from "@nexus/client";
 import type { Config } from "../../src/config.ts";
 import { loadOrCreateKey } from "../../src/crypto/secrets.ts";
 import { runGit } from "../../src/projects/git.ts";
@@ -38,7 +39,7 @@ const makeRepo = async (name: string): Promise<string> => {
 
 const call = (path: string, init: RequestInit = {}) =>
   app(
-    new Request(`http://localhost${path}`, {
+    new Request(`http://localhost${API_PREFIX}${path}`, {
       ...init,
       headers: {
         authorization: `Bearer ${token}`,
@@ -128,7 +129,7 @@ async function readEvents(
   const safety = setTimeout(() => controller.abort(), 20_000);
   try {
     const response = await app(
-      new Request(`http://localhost/sessions/${id}/events`, {
+      new Request(`http://localhost${API_PREFIX}/sessions/${id}/events`, {
         headers: { authorization: `Bearer ${token}` },
         signal: controller.signal,
       }),
