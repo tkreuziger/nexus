@@ -78,6 +78,21 @@ async function registerProject(): Promise<string> {
     body: JSON.stringify({ path }),
   });
   const body = await jsonOf<{ project: { id: string } }>(response);
+  const method = await jsonOf<{ authMethod: { id: string } }>(
+    await call("/auth-methods", {
+      method: "POST",
+      body: JSON.stringify({
+        type: "api_key",
+        provider: "faux",
+        label: "faux key",
+        key: "sk-fake-placeholder",
+      }),
+    }),
+  );
+  await call(`/projects/${body.project.id}/auth-method`, {
+    method: "PUT",
+    body: JSON.stringify({ authMethodId: method.authMethod.id }),
+  });
   return body.project.id;
 }
 
@@ -170,7 +185,7 @@ beforeEach(async () => {
   };
   const secretKey = await loadOrCreateKey(config.secretKeyFile);
   supervisor = new SessionSupervisor(db, config, secretKey);
-  app = createApp({ db, config, supervisor });
+  app = createApp({ db, config, supervisor, secretKey });
   token = (await createUser(db, "owner", "secret-one")).token;
   created = [];
   process.env.NEXUS_PROVIDERS_MODULE = FAUX_MODULE;
@@ -201,6 +216,20 @@ describe("session lifecycle", () => {
       await call(`/projects/${projectId}/sessions`),
     );
     expect(body.sessions.map((session) => session.name)).toEqual(["alpha"]);
+  }, 30_000);
+
+  test("refuses to create a session without an assigned auth method", async () => {
+    const path = await makeRepo("bare");
+    const project = await jsonOf<{ project: { id: string } }>(
+      await call("/projects", { method: "POST", body: JSON.stringify({ path }) }),
+    );
+    const response = await call(`/projects/${project.project.id}/sessions`, {
+      method: "POST",
+      body: JSON.stringify({ name: "no-auth" }),
+    });
+    expect(response.status).toBe(400);
+    const body = await jsonOf<{ error: { message: string } }>(response);
+    expect(body.error.message).toContain("no assigned auth method");
   }, 30_000);
 
   test("rejects a duplicate session name", async () => {

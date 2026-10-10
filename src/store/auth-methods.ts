@@ -94,3 +94,17 @@ export function assignAuthMethod(
     projectId,
   );
 }
+
+/** Clear every project pointing at an auth method that is being deleted. */
+export function unassignAuthMethod(db: Database, authMethodId: AuthMethodId): void {
+  db.query(
+    "UPDATE projects SET assigned_auth_method_id = NULL WHERE assigned_auth_method_id = ?",
+  ).run(authMethodId);
+}
+
+export function deleteAuthMethod(db: Database, id: AuthMethodId): void {
+  db.transaction(() => {
+    unassignAuthMethod(db, id);
+    db.query("DELETE FROM auth_methods WHERE id = ?").run(id);
+  })();
+}

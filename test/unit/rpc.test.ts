@@ -173,4 +173,21 @@ describe("JsonRpc", () => {
     await handled.promise;
     expect(seen).toEqual([1]);
   });
+
+  test("lets a request handler issue its own request without deadlocking", async () => {
+    const fake = fakeChannel();
+    const rpc = new JsonRpc(fake.channel);
+    rpc.onRequest("outer", async () => ({ inner: await rpc.request("inner", {}) }));
+    rpc.start();
+    fake.push({ id: 99, method: "outer", params: {} });
+    await until(() => fake.written().some((frame) => frame.method === "inner"));
+    const inner = fake.written().find((frame) => frame.method === "inner") as { id: number };
+    fake.push({ id: inner.id, ok: true, result: "pong" });
+    await until(() => fake.written().some((frame) => frame.id === 99));
+    expect(fake.written().find((frame) => frame.id === 99)).toEqual({
+      id: 99,
+      ok: true,
+      result: { inner: "pong" },
+    });
+  });
 });

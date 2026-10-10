@@ -1,9 +1,8 @@
 import type { Database } from "bun:sqlite";
-import type { Credential } from "@earendil-works/pi-ai";
+import { isCredential } from "../credentials.ts";
 import { decryptSecret, encryptSecret } from "../crypto/secrets.ts";
 import { asCredentialModifyParams, asCredentialReadParams } from "../protocol/guards.ts";
 import type { CredentialListResult, CredentialResult } from "../protocol/messages.ts";
-import { asRecord } from "../records.ts";
 import {
   getAuthMethod,
   touchAuthMethod,
@@ -23,18 +22,6 @@ export interface CredentialHandlers {
   list(params: unknown): Promise<CredentialListResult>;
   modify(params: unknown): Promise<CredentialResult>;
   delete(params: unknown): Promise<CredentialResult>;
-}
-
-function isCredential(value: unknown): value is Credential {
-  const record = asRecord(value);
-  if (record === undefined) return false;
-  if (record.type === "api_key") return true;
-  return (
-    record.type === "oauth" &&
-    typeof record.refresh === "string" &&
-    typeof record.access === "string" &&
-    typeof record.expires === "number"
-  );
 }
 
 /**

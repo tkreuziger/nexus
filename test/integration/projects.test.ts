@@ -68,7 +68,12 @@ beforeEach(async () => {
     bootstrapToken: null,
   };
   const secretKey = await loadOrCreateKey(config.secretKeyFile);
-  app = createApp({ db, config, supervisor: new SessionSupervisor(db, config, secretKey) });
+  app = createApp({
+    db,
+    config,
+    supervisor: new SessionSupervisor(db, config, secretKey),
+    secretKey,
+  });
   token = (await createUser(db, "owner", "secret-one")).token;
   otherToken = (await createUser(db, "intruder", "secret-two")).token;
 });

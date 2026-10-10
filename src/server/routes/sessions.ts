@@ -98,6 +98,12 @@ export function sessionRoutes(deps: SessionDeps): readonly Route[] {
       path: "/projects/:id/sessions",
       handler: async (scope, request) => {
         const project = requireProject(scope.db, scope.params.id as ProjectId, scope.user.id);
+        if (project.assignedAuthMethodId === null) {
+          throw new HttpError(
+            400,
+            "this project has no assigned auth method; assign one before creating sessions",
+          );
+        }
         const body = await readJsonObject(request);
         const model = modelFrom(body) ?? deps.config.defaultModel;
         if (model === null) {
