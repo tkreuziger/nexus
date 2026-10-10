@@ -1,0 +1,10 @@
+node_modules/
+worktrees/
+data/
+dist/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+.env
+.env.*
+!.env.example
