@@ -1,5 +1,13 @@
 import { HttpError } from "../errors.ts";
 
+/**
+ * Build a JSON response. The type argument is the wire contract's response envelope
+ * (`@nexus/client`), so a handler that stops matching what clients expect fails `tsc`.
+ */
+export function jsonResponse<T>(body: T, status = 200): Response {
+  return Response.json(body, { status, headers: { "cache-control": "no-store" } });
+}
+
 /** Read a request body as a JSON object, rejecting anything else with 400. */
 export async function readJsonObject(request: Request): Promise<Record<string, unknown>> {
   const parsed: unknown = await request.json().catch(() => undefined);

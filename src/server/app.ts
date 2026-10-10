@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { WireError } from "@nexus/client";
 import type { Config } from "../config.ts";
 import { HttpError } from "../errors.ts";
 import type { SessionSupervisor } from "../sessions/supervisor.ts";
@@ -18,7 +19,10 @@ export interface AppDeps {
 }
 
 const errorResponse = (status: number, message: string) =>
-  Response.json({ error: { message } }, { status, headers: { "cache-control": "no-store" } });
+  Response.json({ error: { message } } satisfies WireError, {
+    status,
+    headers: { "cache-control": "no-store" },
+  });
 
 async function route(routes: readonly Route[], deps: AppDeps, request: Request): Promise<Response> {
   const { pathname } = new URL(request.url);

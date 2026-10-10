@@ -8,11 +8,19 @@
         "@earendil-works/chord": "1.1.0",
         "@earendil-works/pi-ai": "1.1.0",
         "@earendil-works/pi-durable": "1.1.0",
+        "@nexus/client": "workspace:*",
       },
       "devDependencies": {
         "@biomejs/biome": "^2.5.15",
         "@types/bun": "^1.4.2",
         "typescript": "^5.9.0",
+      },
+    },
+    "packages/client": {
+      "name": "@nexus/client",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@earendil-works/pi-durable": "1.1.0",
       },
     },
   },
@@ -138,6 +146,8 @@
     "@esbuild/win32-x64": ["@esbuild/win32-x64@0.28.2", "", { "os": "win32", "cpu": "x64" }, "sha512-5ebpxr3nWMzrL/rnUI755Jkuee0bHL/Gq0WTF9lvcpv73wAp5eu8MfBUgWK9bhWvZjj7yX8etf/8tI8Ney695g=="],
 
     "@google/genai": ["@google/genai@2.21.0", "", { "dependencies": { "google-auth-library": "^10.3.0", "p-retry": "^4.6.2", "protobufjs": "^7.5.4", "ws": "^8.18.0" }, "peerDependencies": { "@modelcontextprotocol/sdk": "^1.25.2" }, "optionalPeers": ["@modelcontextprotocol/sdk"] }, "sha512-+PDtco2/Z0ONdzCGekCoCT+O1VJS9xJQNN4XzQpXG/t3El/SWWMkCWlFRO1KmivOHPa4Q0VjUYu1HBKCZ/v33Q=="],
+
+    "@nexus/client": ["@nexus/client@workspace:packages/client"],
 
     "@protobufjs/aspromise": ["@protobufjs/aspromise@1.1.2", "", {}, "sha512-j+gKExEuLmKwvz3OgROXtrJ2UG2x8Ch2YZUxahh+s1F2HZ+wAceUNLkvy6zKCPVRkU++ZWQrdxsUeQXmcg4uoQ=="],
 
