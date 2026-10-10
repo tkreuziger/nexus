@@ -1,4 +1,6 @@
 import { ApiError, errorFromResponse, StreamUnavailableError } from "./errors.ts";
+import { defaultFetch, type FetchLike } from "./fetch.ts";
+import { API_PREFIX } from "./prefix.ts";
 import type { StreamFrame } from "./wire.ts";
 
 /**
@@ -56,12 +58,12 @@ export class SseParser {
 }
 
 export interface StreamOptions {
-  /** Prefix for every request; `""` (the default) means same origin. */
+  /** Prefix for every request. Defaults to the server's API prefix. */
   baseUrl?: string;
   token?: string | null;
   signal?: AbortSignal;
   /** Injectable for tests. */
-  fetch?: typeof fetch;
+  fetch?: FetchLike;
 }
 
 function streamInit(options: StreamOptions): RequestInit {
@@ -74,7 +76,7 @@ function streamInit(options: StreamOptions): RequestInit {
   return init;
 }
 
-export function sessionEventsUrl(sessionId: string, baseUrl = ""): string {
+export function sessionEventsUrl(sessionId: string, baseUrl = API_PREFIX): string {
   return `${baseUrl}/sessions/${encodeURIComponent(sessionId)}/events`;
 }
 
@@ -86,7 +88,7 @@ export async function* readEventStream(
   sessionId: string,
   options: StreamOptions = {},
 ): AsyncGenerator<StreamFrame> {
-  const doFetch = options.fetch ?? globalThis.fetch;
+  const doFetch = options.fetch ?? defaultFetch;
   const response = await doFetch(sessionEventsUrl(sessionId, options.baseUrl), streamInit(options));
   if (response.status === 409) throw new StreamUnavailableError();
   if (!response.ok) throw await errorFromResponse(response);

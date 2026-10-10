@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { API_PREFIX } from "@nexus/client";
 import type { Config } from "../../src/config.ts";
 import { loadOrCreateKey } from "../../src/crypto/secrets.ts";
 import { createApp } from "../../src/server/app.ts";
@@ -23,7 +24,7 @@ const withHeaders = (bearer?: string, json = false): Record<string, string> => {
 
 const post = (path: string, body: unknown, bearer?: string) =>
   app(
-    new Request(`http://localhost${path}`, {
+    new Request(`http://localhost${API_PREFIX}${path}`, {
       method: "POST",
       headers: withHeaders(bearer, true),
       body: JSON.stringify(body),
@@ -31,7 +32,7 @@ const post = (path: string, body: unknown, bearer?: string) =>
   );
 
 const get = (path: string, bearer?: string) =>
-  app(new Request(`http://localhost${path}`, { headers: withHeaders(bearer) }));
+  app(new Request(`http://localhost${API_PREFIX}${path}`, { headers: withHeaders(bearer) }));
 
 const jsonOf = async <T>(response: Response): Promise<T> => (await response.json()) as T;
 

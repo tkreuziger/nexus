@@ -61,9 +61,11 @@ On the first run the server creates a user `owner` and prints a bearer token **o
 
 Every route requires a bearer token except `POST /login`, and every route is scoped to the caller. Another user's project or session is a `404`, never a `403`.
 
+**Every route lives under the `/api` prefix.** The web app owns the rest of the URL space, so a browser navigation to `/projects/anything` loads the app rather than matching `GET /projects/:id` — a document load cannot carry a bearer token, and without the split it returned a `401` instead of a page.
+
 ### Identity
 
-| Method | Path | Notes |
+| Method | Path under `/api` | Notes |
 |---|---|---|
 | `POST` | `/login` | `{ handle, secret }` → `{ token, user }`. The only unauthenticated route; `401` on a bad handle or secret |
 | `GET` | `/me` | The authenticated user, so a client can validate a stored token |
@@ -72,7 +74,7 @@ Every route requires a bearer token except `POST /login`, and every route is sco
 
 ### Projects
 
-| Method | Path | Notes |
+| Method | Path under `/api` | Notes |
 |---|---|---|
 | `POST` | `/projects` | `{ path, name? }`; validates the path is a directory and itself a git repository. `422` when invalid, `409` when the path is already registered |
 | `GET` | `/projects` | The caller's projects |
@@ -85,7 +87,7 @@ Every route requires a bearer token except `POST /login`, and every route is sco
 
 ### Auth methods
 
-| Method | Path | Notes |
+| Method | Path under `/api` | Notes |
 |---|---|---|
 | `POST` | `/auth-methods` | `{ type: "api_key", provider, label?, key }` or `{ type: "oauth", provider, label?, credential: { refresh, access, expires } }`. The credential is encrypted before storage and never returned |
 | `GET` | `/auth-methods` | Metadata only — no secret material |
@@ -95,7 +97,7 @@ A project with no assigned auth method refuses to start a session with `400`.
 
 ### Sessions
 
-| Method | Path | Notes |
+| Method | Path under `/api` | Notes |
 |---|---|---|
 | `POST` | `/projects/:id/sessions` | `{ name, model?, baseRef? }` — creates the worktree and spawns the harness. `409` on a duplicate name, `400` without an auth method |
 | `GET` | `/projects/:id/sessions` | Sessions in a project |

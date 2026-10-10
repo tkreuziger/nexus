@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { SessionStatus, StreamFrame } from "@nexus/client";
+import type { FetchLike, SessionStatus, StreamFrame } from "@nexus/client";
 import { readEventStream, SessionStream, SseParser } from "@nexus/client";
 
 const frame = (value: unknown): string => `data: ${JSON.stringify(value)}\n\n`;
@@ -91,8 +91,7 @@ const streamOf = (chunks: readonly string[]): Response =>
     { status: 200, headers: { "content-type": "text/event-stream" } },
   );
 
-const fetchOf = (response: Response): typeof globalThis.fetch =>
-  (async () => response) as unknown as typeof globalThis.fetch;
+const fetchOf = (response: Response): FetchLike => (async () => response) as unknown as FetchLike;
 
 describe("readEventStream", () => {
   test("yields frames across chunk boundaries and stops at the end", async () => {
@@ -131,7 +130,7 @@ describe("readEventStream", () => {
     const fakeFetch = (async (_input: string, init?: RequestInit): Promise<Response> => {
       seen = init;
       return streamOf([frame({ type: "turn_start" })]);
-    }) as unknown as typeof globalThis.fetch;
+    }) as unknown as FetchLike;
     for await (const _ of readEventStream("s1", { token: "nx_t_s", fetch: fakeFetch })) {
       // Drain.
     }
