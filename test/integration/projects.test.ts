@@ -59,6 +59,7 @@ beforeEach(async () => {
   base = mkdtempSync(join(tmpdir(), "nexus-api-"));
   config = {
     projectsRoot: base,
+    worktreesRoot: base,
     dataDir: base,
     piStorageDir: join(base, "sessions"),
     listen: { host: "127.0.0.1", port: 0 },

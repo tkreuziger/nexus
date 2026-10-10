@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { type ChildProcess, spawn } from "node:child_process";
+import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { Config } from "../config.ts";
 import { HttpError } from "../errors.ts";
@@ -14,6 +15,7 @@ import { HARNESS_METHODS } from "../protocol/messages.ts";
 import { appendMirrorEntry, findRequest, recordRequest } from "../store/messages.ts";
 import { getProjectById } from "../store/projects.ts";
 import {
+  deleteSession,
   getSession,
   type InsertSessionInput,
   insertSession,
@@ -26,7 +28,9 @@ import type { ModelRef, Project, ProjectId, Session, SessionId } from "../types.
 import { credentialHandlers } from "./credentials.ts";
 import { SessionHub } from "./hub.ts";
 import { childChannel, HarnessClient } from "./ipc.ts";
+import { KeyedLock } from "./locks.ts";
 import { toMirrorMapping } from "./mirror.ts";
+import { createWorktree, removeWorktree, worktreePathFor } from "./worktree.ts";
 
 const HARNESS_ENTRY = join(import.meta.dir, "..", "harness", "main.ts");
 
@@ -46,6 +50,8 @@ export interface CreateSessionInput {
 /** Owns the harness processes: spawn, track, restart, stop, and the status each session reports. */
 export class SessionSupervisor {
   readonly #running = new Map<SessionId, Running>();
+  /** Serializes worktree creation and removal per project (§7). */
+  readonly #locks = new KeyedLock();
 
   constructor(
     private readonly db: Database,
@@ -74,15 +80,32 @@ export class SessionSupervisor {
 
   async create(project: Project, input: CreateSessionInput): Promise<Session> {
     const id = crypto.randomUUID() as SessionId;
+    const worktreePath = worktreePathFor(this.config.worktreesRoot, project.name, id);
     const session = this.#insert({
       id,
       projectId: project.id,
       name: input.name,
-      worktreePath: project.path,
+      worktreePath,
       branch: `pi/${input.name}`,
       baseRef: input.baseRef,
       model: input.model,
     });
+    try {
+      // Serialized per project: concurrent `git worktree add` calls on one repository race.
+      await this.#locks.run(project.id, () =>
+        createWorktree({
+          projectPath: project.path,
+          projectName: project.name,
+          sessionId: id,
+          sessionName: input.name,
+          baseRef: input.baseRef,
+          root: this.config.worktreesRoot,
+        }),
+      );
+    } catch (error) {
+      deleteSession(this.db, id);
+      throw error;
+    }
     await this.start(session);
     return this.get(id) ?? session;
   }
@@ -188,6 +211,26 @@ export class SessionSupervisor {
     if (session === undefined) throw new HttpError(404, `no such session: ${id}`);
     await this.stop(id);
     await this.start(session);
+  }
+
+  /**
+   * Delete a session: stop the process, remove its worktree, and drop its stored data. The branch is
+   * preserved (ADR-7), and a worktree holding uncommitted work is refused unless `force` is set.
+   */
+  async remove(id: SessionId, options: { force?: boolean } = {}): Promise<void> {
+    const session = this.get(id);
+    if (session === undefined) throw new HttpError(404, `no such session: ${id}`);
+    const project = getProjectById(this.db, session.projectId);
+    await this.stop(id);
+    if (project !== undefined) {
+      await this.#locks.run(project.id, () =>
+        removeWorktree(project.path, session.worktreePath, options),
+      );
+    }
+    deleteSession(this.db, id);
+    await rm(join(this.config.piStorageDir, `${id}.sqlite`), { force: true });
+    await rm(join(this.config.piStorageDir, `${id}.sqlite-wal`), { force: true });
+    await rm(join(this.config.piStorageDir, `${id}.sqlite-shm`), { force: true });
   }
 
   #wire(session: Session, running: Running): void {

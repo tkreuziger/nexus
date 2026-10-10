@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Config } from "../../src/config.ts";
@@ -160,6 +160,7 @@ beforeEach(async () => {
   base = mkdtempSync(join(tmpdir(), "nexus-sessions-"));
   config = {
     projectsRoot: base,
+    worktreesRoot: base,
     dataDir: base,
     piStorageDir: join(base, "sessions"),
     listen: { host: "127.0.0.1", port: 0 },
@@ -305,11 +306,13 @@ describe("conversation interaction", () => {
     expect(Array.isArray(entries) ? entries.length : 0).toBeGreaterThanOrEqual(3);
   }, 30_000);
 
-  test("rejects an event stream for a stopped session", async () => {
+  test("rejects an event stream for a session whose process died", async () => {
     const projectId = await registerProject();
     const id = await createSession(projectId);
     await waitForStatus(id, "idle");
-    await call(`/sessions/${id}`, { method: "DELETE" });
+    const running = await jsonOf<{ session: { pid: number } }>(await call(`/sessions/${id}`));
+    process.kill(running.session.pid, "SIGKILL");
+    await waitForStatus(id, "crashed");
     const response = await call(`/sessions/${id}/events`);
     expect(response.status).toBe(409);
   }, 30_000);
@@ -332,5 +335,106 @@ describe("conversation interaction", () => {
       await call(`/sessions/${id}`),
     );
     expect(after.session.conversationId).toBe(before.session.conversationId);
+  }, 30_000);
+});
+
+describe("worktree isolation", () => {
+  const sessionOf = async (id: SessionId) =>
+    jsonOf<{ session: { worktreePath: string; branch: string } }>(await call(`/sessions/${id}`));
+
+  test("gives each session its own worktree outside the project checkout", async () => {
+    const projectId = await registerProject();
+    const first = await createSession(projectId, "alpha");
+    const second = await createSession(projectId, "beta");
+    await waitForStatus(first, "idle");
+    await waitForStatus(second, "idle");
+
+    const one = await sessionOf(first);
+    const two = await sessionOf(second);
+    expect(one.session.worktreePath).not.toBe(two.session.worktreePath);
+    expect(one.session.worktreePath).toContain(join(".pi-worktrees", "repo"));
+    expect(one.session.branch).toBe("pi/alpha");
+    expect(two.session.branch).toBe("pi/beta");
+
+    const worktrees = await runGit(["worktree", "list", "--porcelain"], join(base, "repo"));
+    expect(worktrees).toContain(one.session.worktreePath);
+    expect(worktrees).toContain(two.session.worktreePath);
+  }, 30_000);
+
+  test("keeps edits in one session out of the others and the checkout", async () => {
+    const projectId = await registerProject();
+    const first = await createSession(projectId, "alpha");
+    const second = await createSession(projectId, "beta");
+    await waitForStatus(first, "idle");
+    await waitForStatus(second, "idle");
+    const one = await sessionOf(first);
+    const two = await sessionOf(second);
+
+    writeFileSync(join(one.session.worktreePath, "only-alpha.txt"), "x\n");
+    expect(existsSync(join(two.session.worktreePath, "only-alpha.txt"))).toBe(false);
+    expect(existsSync(join(base, "repo", "only-alpha.txt"))).toBe(false);
+    expect((await runGit(["status", "--porcelain"], join(base, "repo"))).trim()).toBe("");
+  }, 30_000);
+
+  test("deletes the worktree and preserves the branch", async () => {
+    const projectId = await registerProject();
+    const id = await createSession(projectId, "alpha");
+    await waitForStatus(id, "idle");
+    const { session } = await sessionOf(id);
+
+    const response = await call(`/sessions/${id}`, { method: "DELETE" });
+    const body = await jsonOf<{ deleted: boolean; preservedBranch: string }>(response);
+    expect(response.status).toBe(200);
+    expect(body.preservedBranch).toBe("pi/alpha");
+    expect(existsSync(session.worktreePath)).toBe(false);
+
+    const branches = await runGit(["branch", "--list", "pi/alpha"], join(base, "repo"));
+    expect(branches).toContain("pi/alpha");
+    expect((await call(`/sessions/${id}`)).status).toBe(404);
+  }, 30_000);
+
+  test("refuses to delete uncommitted work, then deletes it when forced", async () => {
+    const projectId = await registerProject();
+    const id = await createSession(projectId, "alpha");
+    await waitForStatus(id, "idle");
+    const { session } = await sessionOf(id);
+    writeFileSync(join(session.worktreePath, "uncommitted.txt"), "keep me\n");
+
+    const refused = await call(`/sessions/${id}`, { method: "DELETE" });
+    expect(refused.status).toBe(409);
+    expect(existsSync(session.worktreePath)).toBe(true);
+
+    const forced = await call(`/sessions/${id}?force=true`, { method: "DELETE" });
+    expect(forced.status).toBe(200);
+    expect(existsSync(session.worktreePath)).toBe(false);
+  }, 30_000);
+
+  test("keeps the worktree and the transcript across a crash and restart", async () => {
+    const projectId = await registerProject();
+    const id = await createSession(projectId, "alpha");
+    await waitForStatus(id, "idle");
+    const { session } = await sessionOf(id);
+
+    const finished = readEvents(id, (events) => eventTypes(events).includes("run_end"));
+    await call(`/sessions/${id}/messages`, {
+      method: "POST",
+      body: JSON.stringify({ requestId: "before-crash", text: "hello" }),
+    });
+    await finished;
+
+    const pid = await jsonOf<{ session: { pid: number } }>(await call(`/sessions/${id}`));
+    process.kill(pid.session.pid, "SIGKILL");
+    await waitForStatus(id, "crashed");
+    expect(existsSync(session.worktreePath)).toBe(true);
+
+    await call(`/sessions/${id}/restart`, { method: "POST" });
+    await waitForStatus(id, "idle");
+    const after = await sessionOf(id);
+    expect(after.session.worktreePath).toBe(session.worktreePath);
+
+    const mirrored = await jsonOf<{ messages: { role: string }[] }>(
+      await call(`/sessions/${id}/messages`),
+    );
+    expect(mirrored.messages.map((message) => message.role)).toEqual(["user", "assistant"]);
   }, 30_000);
 });
