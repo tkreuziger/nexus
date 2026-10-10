@@ -1,10 +1,11 @@
 /** Message shapes exchanged between the server and a harness process (ADR-1). */
 import type { Credential } from "@earendil-works/pi-ai";
-import type { ModelRef, SessionStatus } from "../types.ts";
+import type { ModelRef, SessionStatus, ThinkingLevel } from "../types.ts";
 
 /** Methods the server calls on the harness. */
 export const SERVER_METHODS = {
   init: "init",
+  configure: "configure",
   submit: "submit",
   abort: "abort",
   subscribe: "subscribe",
@@ -30,8 +31,18 @@ export interface InitParams {
   cwd: string;
   dbPath: string;
   model: ModelRef;
+  thinkingLevel: ThinkingLevel;
   authMethodId: string | null;
   compaction: { reserveTokens: number; keepRecentTokens: number };
+}
+
+/**
+ * Change what the conversation runs with. Applied to the next request rather than the one in flight,
+ * which is Pi Durable's own rule for `configure`.
+ */
+export interface ConfigureParams {
+  model: ModelRef;
+  thinkingLevel: ThinkingLevel;
 }
 
 export interface InitResult {

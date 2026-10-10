@@ -1,17 +1,21 @@
 import type { Database } from "bun:sqlite";
-import type {
-  AbortedResponse,
-  CreateSessionResponse,
-  DeleteSessionResponse,
-  ListSessionsResponse,
-  MessagesResponse,
-  SessionResponse,
-  SubmitMessageResponse,
+import {
+  type AbortedResponse,
+  type CreateSessionResponse,
+  type DeleteSessionResponse,
+  type ListSessionFilesResponse,
+  type ListSessionsResponse,
+  type MessagesResponse,
+  type SessionResponse,
+  type SubmitMessageResponse,
+  THINKING_LEVELS,
+  type ThinkingLevel,
 } from "@nexus/client";
 import type { ModelCatalog } from "../../catalog.ts";
 import type { Config } from "../../config.ts";
 import { HttpError } from "../../errors.ts";
 import { requireProject } from "../../projects/registry.ts";
+import { listWorktreeFiles } from "../../sessions/files.ts";
 import type { SessionSupervisor } from "../../sessions/supervisor.ts";
 import { listMessages } from "../../store/messages.ts";
 import { getProjectById } from "../../store/projects.ts";
@@ -43,6 +47,16 @@ function modelFrom(body: Record<string, unknown>): ModelRef | undefined {
     provider: requiredString(record, "provider"),
     modelId: requiredString(record, "modelId"),
   };
+}
+
+/** A level the body does not name, or names wrongly, is refused rather than silently defaulted. */
+function thinkingLevelFrom(body: Record<string, unknown>): ThinkingLevel {
+  const value = body.thinkingLevel;
+  const level = THINKING_LEVELS.find((candidate) => candidate === value);
+  if (level === undefined) {
+    throw new HttpError(400, `"thinkingLevel" must be one of ${THINKING_LEVELS.join(", ")}`);
+  }
+  return level;
 }
 
 /** Resolve a session the caller owns, or throw 404 without revealing that it exists. */
@@ -152,6 +166,8 @@ export function sessionRoutes(deps: SessionDeps): readonly Route[] {
         const session = await deps.supervisor.create(project, {
           name: requiredString(body, "name"),
           model,
+          // A new session starts with thinking off; the settings dialog is where it is turned up.
+          thinkingLevel: "off",
           baseRef: optionalString(body, "baseRef") ?? "HEAD",
         });
         return jsonResponse<CreateSessionResponse>({ session }, 201);
@@ -183,6 +199,19 @@ export function sessionRoutes(deps: SessionDeps): readonly Route[] {
       },
     },
     {
+      // The worktree's file list, whole, for `@` mention completion: one read per session rather than
+      // a walk per keystroke.
+      method: "GET",
+      path: "/sessions/:id/files",
+      handler: async (scope, request) => {
+        const session = requireOwnedSession(scope, deps);
+        const limit = boundedInt(new URL(request.url), "limit", 5000, 20000);
+        return jsonResponse<ListSessionFilesResponse>(
+          await listWorktreeFiles(session.worktreePath, limit),
+        );
+      },
+    },
+    {
       method: "POST",
       path: "/sessions/:id/messages",
       handler: async (scope, request) => {
@@ -202,6 +231,30 @@ export function sessionRoutes(deps: SessionDeps): readonly Route[] {
         const session = requireOwnedSession(scope, deps);
         await deps.supervisor.abort(session.id);
         return jsonResponse<AbortedResponse>({ aborted: true });
+      },
+    },
+    {
+      method: "POST",
+      path: "/sessions/:id/settings",
+      handler: async (scope, request) => {
+        const session = requireOwnedSession(scope, deps);
+        const body = await readJsonObject(request);
+        const model = modelFrom(body);
+        if (model === undefined) throw new HttpError(400, '"model" is required');
+        // The same catalogue check creation does: a harness resolves the model against it, so an
+        // unknown one would otherwise fail on the next request instead of here.
+        if ((await deps.catalog.provider(model.provider)) === undefined) {
+          throw new HttpError(400, `unknown provider "${model.provider}"`);
+        }
+        if ((await deps.catalog.model(model.provider, model.modelId)) === undefined) {
+          throw new HttpError(400, `provider "${model.provider}" has no model "${model.modelId}"`);
+        }
+        return jsonResponse<SessionResponse>({
+          session: await deps.supervisor.configure(session.id, {
+            model,
+            thinkingLevel: thinkingLevelFrom(body),
+          }),
+        });
       },
     },
     {

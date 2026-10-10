@@ -22,10 +22,15 @@ import {
 } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api.ts";
+import { COMMANDS, type CommandContext } from "../commands.ts";
+import { applyCompletion, detectTrigger, type Trigger } from "../completions.ts";
 import { CodeBlock } from "../components/CodeBlock.tsx";
+import { type CompletionOption, Completions } from "../components/Completions.tsx";
 import { Markdown } from "../components/Markdown.tsx";
 import { Modal } from "../components/Modal.tsx";
+import { SessionSettingsDialog } from "../components/SessionSettingsDialog.tsx";
 import { readDraft, writeDraft } from "../draft.ts";
+import { fuzzyRank } from "../fuzzy.ts";
 
 const STREAM_LABEL: Record<StreamState, string> = {
   connecting: "connecting…",
@@ -70,6 +75,26 @@ function MaximizeIcon(): ReactElement {
       <polyline points="9 21 3 21 3 15" />
       <line x1="21" y1="3" x2="14" y2="10" />
       <line x1="3" y1="21" x2="10" y2="14" />
+    </svg>
+  );
+}
+
+/** The gear for the session's own settings, in the header's top right. */
+function GearIcon(): ReactElement {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="15"
+      height="15"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>
   );
 }
@@ -156,6 +181,14 @@ export function SessionViewPage(): ReactElement {
     refetchInterval: 3_000,
   });
   const messages = useQuery({ queryKey: ["messages", id], queryFn: () => api.listMessages(id) });
+  // Fetched once per session and filtered in the browser: completing `@` should not re-walk the
+  // worktree on every keystroke.
+  const files = useQuery({
+    queryKey: ["session-files", id],
+    queryFn: () => api.listSessionFiles(id),
+    staleTime: 30_000,
+  });
+  const worktreeFiles = files.status === "success" ? files.data.files : [];
 
   const [live, dispatch] = useReducer(reduceLiveState, initialLiveState);
   const [streamState, setStreamState] = useState<StreamState>("closed");
@@ -188,8 +221,17 @@ export function SessionViewPage(): ReactElement {
   const onTextChange = (event: ChangeEvent<HTMLTextAreaElement>): void => {
     const value = event.target.value;
     setText(value);
+    setCaret(event.target.selectionStart ?? value.length);
+    // Typing reopens a list the reader dismissed, and starts the choice over.
+    setDismissed(false);
+    setSelected(0);
     // Persist on every keystroke, so a reload or an accidental navigation keeps the draft.
     writeDraft(id, value);
+  };
+
+  /** Arrow keys and clicks move the caret without changing the text. */
+  const onCaretMove = (event: { currentTarget: HTMLTextAreaElement }): void => {
+    setCaret(event.currentTarget.selectionStart ?? 0);
   };
 
   // One id per draft. A send that fails and is retried repeats the id, and the server treats a repeat
@@ -227,7 +269,18 @@ export function SessionViewPage(): ReactElement {
   // The composer grows with its draft up to a fifth of the viewport and then scrolls. CSS carries the
   // same cap, so a window resize cannot leave a stale pixel height behind.
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const modalRef = useRef<HTMLTextAreaElement>(null);
   const [expanded, setExpanded] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // Which completion is on offer depends on the caret, so it is state rather than a ref: moving the
+  // caret has to re-render the list.
+  const [caret, setCaret] = useState(0);
+  const [selected, setSelected] = useState(0);
+  const [dismissed, setDismissed] = useState(false);
+  const [activeField, setActiveField] = useState<"inline" | "modal">("inline");
+  /** Set by a pick, applied after the render that carries the new text. */
+  const pendingCaretRef = useRef<number | null>(null);
 
   useLayoutEffect(() => {
     const element = composerRef.current;
@@ -235,6 +288,17 @@ export function SessionViewPage(): ReactElement {
     element.style.height = "auto";
     const border = element.offsetHeight - element.clientHeight;
     element.style.height = `${element.scrollHeight + border}px`;
+  });
+
+  // A pick rewrites the text programmatically, so the caret has to be put back by hand — in whichever
+  // of the two prompts is being typed in.
+  useLayoutEffect(() => {
+    const pending = pendingCaretRef.current;
+    const element = activeField === "modal" ? modalRef.current : composerRef.current;
+    if (pending === null || element === null) return;
+    pendingCaretRef.current = null;
+    element.focus();
+    element.setSelectionRange(pending, pending);
   });
 
   const send = useMutation({
@@ -269,19 +333,96 @@ export function SessionViewPage(): ReactElement {
     sendPrompt();
   };
 
-  const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
-    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-      event.preventDefault();
-      sendPrompt();
-    }
-  };
-
   const committed = messages.status === "success" ? messages.data.messages : [];
   const overlay = live.message === null ? null : mirrorContentOfAssistant(live.message);
   // The stream's status is immediate; the polled one can lag a turn by seconds, which is exactly the
   // window in which someone would want to abort.
   const status = live.status ?? (session.status === "success" ? session.data.session.status : null);
   const detached = streamState === "unavailable" || streamState === "closed";
+
+  // What the prompt is offering to complete. Worked out only while a trigger is active, so a
+  // streaming turn pays nothing for any of this.
+  const trigger: Trigger | null = dismissed ? null : detectTrigger(text, caret);
+  const commandContext: CommandContext = {
+    running: status === "running",
+    abort: () => abort.mutate(),
+    restart: () => restart.mutate(),
+    expand: () => setExpanded(true),
+    clear: () => {
+      setText("");
+      writeDraft(id, "");
+    },
+  };
+  const options: CompletionOption[] =
+    trigger === null
+      ? []
+      : trigger.kind === "command"
+        ? fuzzyRank(
+            trigger.query,
+            COMMANDS.filter(
+              (command) => command.available === undefined || command.available(commandContext),
+            ),
+            (command) => command.name,
+            8,
+          ).map(({ item, indices }) => ({
+            id: `command:${item.name}`,
+            label: item.name,
+            detail: item.summary,
+            indices,
+            run: () => item.run(commandContext),
+          }))
+        : fuzzyRank(trigger.query, worktreeFiles, (file) => file, 8).map(({ item, indices }) => ({
+            id: `file:${item}`,
+            label: item,
+            detail: "",
+            indices,
+          }));
+
+  const pick = (option: CompletionOption): void => {
+    if (trigger === null) return;
+    // A command takes its own token away. A mention puts the path back with its `@` and a trailing
+    // space — unless one is already there, which happens when completing mid-sentence.
+    const following = text[trigger.end];
+    const suffix = following === undefined || !/\s/.test(following) ? " " : "";
+    const replacement = option.run === undefined ? `@${option.label}${suffix}` : "";
+    const next = applyCompletion(text, trigger, replacement);
+    setText(next.text);
+    writeDraft(id, next.text);
+    setCaret(next.caret);
+    setSelected(0);
+    pendingCaretRef.current = next.caret;
+    option.run?.();
+  };
+
+  const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
+    // Sending wins: ⌘/Ctrl+Enter is unambiguous, and an open list must not swallow it.
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      sendPrompt();
+      return;
+    }
+    if (options.length === 0) return;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setSelected((index) => (index + 1) % options.length);
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setSelected((index) => (index - 1 + options.length) % options.length);
+      return;
+    }
+    if (event.key === "Enter" || event.key === "Tab") {
+      event.preventDefault();
+      const option = options[selected];
+      if (option !== undefined) pick(option);
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setDismissed(true);
+    }
+  };
 
   // The header names the model once; the branch is `pi/<name>` by construction, so repeating it there
   // would print the session's name a second time.
@@ -307,6 +448,15 @@ export function SessionViewPage(): ReactElement {
             {streamState === "open" ? null : (
               <span className="muted mono">{STREAM_LABEL[streamState]}</span>
             )}
+            <button
+              type="button"
+              className="chat-gear"
+              aria-label="Session settings"
+              title="Session settings"
+              onClick={() => setSettingsOpen(true)}
+            >
+              <GearIcon />
+            </button>
           </div>
           {meta.length === 0 ? null : <p className="muted mono chat-meta">{meta.join(" · ")}</p>}
           {live.compactions.length > 0 ? <p className="meta-row">compacting context…</p> : null}
@@ -335,6 +485,16 @@ export function SessionViewPage(): ReactElement {
           ) : null}
         </div>
       </header>
+
+      {session.status === "success" ? (
+        <SessionSettingsDialog
+          sessionId={id}
+          model={session.data.session.model}
+          thinkingLevel={session.data.session.thinkingLevel}
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+        />
+      ) : null}
 
       <div className="chat-scroll" ref={scrollRef} onScroll={onScroll}>
         <div className="chat-col chat-transcript">
@@ -391,6 +551,15 @@ export function SessionViewPage(): ReactElement {
         <div className="chat-col chat-foot-col">
           <form className="stack composer" onSubmit={submit}>
             <div className="composer-field">
+              {activeField === "inline" ? (
+                <Completions
+                  id="prompt-completions"
+                  options={options}
+                  selected={selected}
+                  onPick={pick}
+                  onHover={setSelected}
+                />
+              ) : null}
               <textarea
                 ref={composerRef}
                 className="composer-input"
@@ -398,8 +567,21 @@ export function SessionViewPage(): ReactElement {
                 rows={1}
                 placeholder="Ask the agent to do something in its worktree"
                 aria-label="Prompt"
+                role="combobox"
+                aria-expanded={options.length > 0}
+                aria-controls="prompt-completions"
+                aria-autocomplete="list"
+                aria-activedescendant={
+                  options.length === 0 ? undefined : `prompt-completions-${selected}`
+                }
                 onChange={onTextChange}
                 onKeyDown={onKeyDown}
+                onKeyUp={onCaretMove}
+                onClick={onCaretMove}
+                onFocus={(event) => {
+                  setActiveField("inline");
+                  onCaretMove(event);
+                }}
               />
               <button
                 type="button"
@@ -453,14 +635,39 @@ export function SessionViewPage(): ReactElement {
           )}
           <Modal open={expanded} title="Prompt" size="large" onClose={() => setExpanded(false)}>
             <div className="prompt-modal">
-              <textarea
-                className="composer-input composer-input-large"
-                value={text}
-                placeholder="Ask the agent to do something in its worktree"
-                aria-label="Prompt"
-                onChange={onTextChange}
-                onKeyDown={onKeyDown}
-              />
+              <div className="prompt-field">
+                {activeField === "modal" ? (
+                  <Completions
+                    id="modal-completions"
+                    options={options}
+                    selected={selected}
+                    onPick={pick}
+                    onHover={setSelected}
+                  />
+                ) : null}
+                <textarea
+                  ref={modalRef}
+                  className="composer-input composer-input-large"
+                  value={text}
+                  placeholder="Ask the agent to do something in its worktree"
+                  aria-label="Prompt"
+                  role="combobox"
+                  aria-expanded={options.length > 0}
+                  aria-controls="modal-completions"
+                  aria-autocomplete="list"
+                  aria-activedescendant={
+                    options.length === 0 ? undefined : `modal-completions-${selected}`
+                  }
+                  onChange={onTextChange}
+                  onKeyDown={onKeyDown}
+                  onKeyUp={onCaretMove}
+                  onClick={onCaretMove}
+                  onFocus={(event) => {
+                    setActiveField("modal");
+                    onCaretMove(event);
+                  }}
+                />
+              </div>
               <div className="row">
                 <SendHint />
                 <button

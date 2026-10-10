@@ -22,9 +22,10 @@ import {
   listLiveSessions,
   listSessions,
   setSessionConversation,
+  setSessionSettings,
   setSessionStatus,
 } from "../store/sessions.ts";
-import type { ModelRef, Project, ProjectId, Session, SessionId } from "../types.ts";
+import type { ModelRef, Project, ProjectId, Session, SessionId, ThinkingLevel } from "../types.ts";
 import { credentialHandlers } from "./credentials.ts";
 import { SessionHub } from "./hub.ts";
 import { childChannel, HarnessClient } from "./ipc.ts";
@@ -44,6 +45,7 @@ interface Running {
 export interface CreateSessionInput {
   name: string;
   model: ModelRef;
+  thinkingLevel: ThinkingLevel;
   baseRef: string;
 }
 
@@ -89,6 +91,7 @@ export class SessionSupervisor {
       branch: `pi/${input.name}`,
       baseRef: input.baseRef,
       model: input.model,
+      thinkingLevel: input.thinkingLevel,
     });
     try {
       // Serialized per project: concurrent `git worktree add` calls on one repository race.
@@ -144,6 +147,7 @@ export class SessionSupervisor {
       cwd: session.worktreePath,
       dbPath: join(this.config.piStorageDir, `${session.id}.sqlite`),
       model: session.model,
+      thinkingLevel: session.thinkingLevel,
       authMethodId: project?.assignedAuthMethodId ?? null,
       compaction: this.config.compaction,
     });
@@ -166,6 +170,22 @@ export class SessionSupervisor {
     const running = this.#running.get(id);
     if (running === undefined) throw new HttpError(409, "session is not running");
     await running.client.abort();
+  }
+
+  /**
+   * Change what the session runs with. The process is told first: if it refuses, nothing is recorded
+   * and the two cannot disagree. A stopped session simply keeps the setting for its next start.
+   */
+  async configure(
+    id: SessionId,
+    settings: { model: ModelRef; thinkingLevel: ThinkingLevel },
+  ): Promise<Session> {
+    const session = this.get(id);
+    if (session === undefined) throw new HttpError(404, `no such session: ${id}`);
+    const running = this.#running.get(id);
+    if (running !== undefined) await running.client.configure(settings);
+    setSessionSettings(this.db, id, settings);
+    return this.get(id) ?? session;
   }
 
   /**

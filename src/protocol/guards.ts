@@ -1,7 +1,9 @@
 /** Narrowing for params arriving over IPC: both ends are ours, but the wire is still untrusted input. */
+import { THINKING_LEVELS, type ThinkingLevel } from "@nexus/client";
 import { HttpError } from "../errors.ts";
 import { asRecord } from "../records.ts";
 import type {
+  ConfigureParams,
   CredentialModifyParams,
   CredentialReadParams,
   EntryParams,
@@ -36,9 +38,32 @@ const asNumber = (source: Record<string, unknown>, key: string, label: string): 
   return value;
 };
 
+const asModelRef = (value: unknown, label: string): { provider: string; modelId: string } => {
+  const model = asObject(value, label);
+  return {
+    provider: asString(model, "provider", label),
+    modelId: asString(model, "modelId", label),
+  };
+};
+
+const asThinkingLevel = (value: unknown, label: string): ThinkingLevel => {
+  const level = THINKING_LEVELS.find((candidate) => candidate === value);
+  if (level === undefined) {
+    throw new Error(`${label}: "thinkingLevel" must be one of ${THINKING_LEVELS.join(", ")}`);
+  }
+  return level;
+};
+
+export function asConfigureParams(value: unknown): ConfigureParams {
+  const source = asObject(value, "configure");
+  return {
+    model: asModelRef(source.model, "configure.model"),
+    thinkingLevel: asThinkingLevel(source.thinkingLevel, "configure"),
+  };
+}
+
 export function asInitParams(value: unknown): InitParams {
   const source = asObject(value, "init");
-  const model = asObject(source.model, "init.model");
   const compaction = asObject(source.compaction, "init.compaction");
   const authMethodId = source.authMethodId;
   if (authMethodId !== null && typeof authMethodId !== "string") {
@@ -48,10 +73,8 @@ export function asInitParams(value: unknown): InitParams {
     sessionId: asString(source, "sessionId", "init"),
     cwd: asString(source, "cwd", "init"),
     dbPath: asString(source, "dbPath", "init"),
-    model: {
-      provider: asString(model, "provider", "init.model"),
-      modelId: asString(model, "modelId", "init.model"),
-    },
+    model: asModelRef(source.model, "init.model"),
+    thinkingLevel: asThinkingLevel(source.thinkingLevel, "init"),
     authMethodId,
     compaction: {
       reserveTokens: asNumber(compaction, "reserveTokens", "init.compaction"),

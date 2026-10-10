@@ -1,6 +1,7 @@
 import type { ChildProcess } from "node:child_process";
 import { createInterface } from "node:readline";
 import {
+  type ConfigureParams,
   type InitParams,
   type InitResult,
   SERVER_METHODS,
@@ -35,6 +36,10 @@ export class HarnessClient {
 
   init(params: InitParams): Promise<InitResult> {
     return this.rpc.request<InitResult>(SERVER_METHODS.init, params);
+  }
+
+  async configure(params: ConfigureParams): Promise<void> {
+    await this.rpc.request(SERVER_METHODS.configure, params);
   }
 
   submit(params: SubmitParams): Promise<SubmitResult> {
