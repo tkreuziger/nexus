@@ -104,7 +104,11 @@ const waitForStatus = (id: SessionId, status: string) =>
   );
 
 /** Read SSE frames until `stop` is satisfied, aborting the request when done. */
-async function readEvents(id: SessionId, stop: (events: unknown[]) => boolean): Promise<unknown[]> {
+async function readEvents(
+  id: SessionId,
+  stop: (events: unknown[]) => boolean,
+  onAttached?: () => void,
+): Promise<unknown[]> {
   const controller = new AbortController();
   const safety = setTimeout(() => controller.abort(), 20_000);
   try {
@@ -129,7 +133,12 @@ async function readEvents(id: SessionId, stop: (events: unknown[]) => boolean): 
         const frame = buffer.slice(0, boundary);
         buffer = buffer.slice(boundary + 2);
         const data = frame.split("\n").find((line) => line.startsWith("data: "));
-        if (data !== undefined) events.push(JSON.parse(data.slice(6)));
+        if (data !== undefined) {
+          const event: unknown = JSON.parse(data.slice(6));
+          events.push(event);
+          // The snapshot proves this client's attachment exists, so a later submit cannot race it.
+          if (eventTypes([event]).includes("snapshot")) onAttached?.();
+        }
       }
     }
     await reader.cancel();
@@ -211,7 +220,13 @@ describe("conversation interaction", () => {
     const id = await createSession(projectId);
     await waitForStatus(id, "idle");
 
-    const eventsPromise = readEvents(id, (events) => eventTypes(events).includes("run_end"));
+    const attached = Promise.withResolvers<void>();
+    const eventsPromise = readEvents(
+      id,
+      (events) => eventTypes(events).includes("run_end"),
+      () => attached.resolve(),
+    );
+    await attached.promise;
     await call(`/sessions/${id}/messages`, {
       method: "POST",
       body: JSON.stringify({ requestId: "req-1", text: "say hello" }),
@@ -262,7 +277,13 @@ describe("conversation interaction", () => {
     const projectId = await registerProject();
     const id = await createSession(projectId);
     await waitForStatus(id, "idle");
-    const finished = readEvents(id, (events) => eventTypes(events).includes("run_end"));
+    const attached = Promise.withResolvers<void>();
+    const finished = readEvents(
+      id,
+      (events) => eventTypes(events).includes("run_end"),
+      () => attached.resolve(),
+    );
+    await attached.promise;
     await call(`/sessions/${id}/messages`, {
       method: "POST",
       body: JSON.stringify({ requestId: "req-late", text: "hello" }),
