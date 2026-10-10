@@ -13,7 +13,7 @@ export interface RequestScope {
 export type RouteHandler = (scope: RequestScope, request: Request) => Promise<Response> | Response;
 
 export interface Route {
-  method: "GET" | "POST" | "DELETE";
+  method: "GET" | "POST" | "PUT" | "DELETE";
   path: string;
   handler: RouteHandler;
 }

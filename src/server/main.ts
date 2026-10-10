@@ -37,7 +37,7 @@ async function main(): Promise<void> {
   const server = Bun.serve({
     hostname: config.listen.host,
     port: config.listen.port,
-    fetch: createApp({ db, config, supervisor }),
+    fetch: createApp({ db, config, supervisor, secretKey }),
   });
   console.log(`nexus: listening on http://${server.hostname}:${server.port}`);
   console.log(`nexus: projects root ${config.projectsRoot}`);

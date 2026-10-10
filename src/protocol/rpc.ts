@@ -83,7 +83,7 @@ export class JsonRpc {
     try {
       for await (const line of this.channel.lines) {
         const frame = parseFrame(line);
-        if (frame !== undefined) await this.#handle(frame);
+        if (frame !== undefined) this.#handle(frame);
       }
     } catch (error) {
       console.error("ipc: read failed", error);
@@ -91,13 +91,17 @@ export class JsonRpc {
     this.#shutdown();
   }
 
-  async #handle(frame: Frame): Promise<void> {
+  /**
+   * Handles one frame. Request handlers are *not* awaited: a handler may itself call the peer
+   * (the credential proxy does), and its response could only arrive through this loop.
+   */
+  #handle(frame: Frame): void {
     if (frame.id !== undefined && frame.ok !== undefined) {
       this.#settle(frame);
       return;
     }
     if (frame.id !== undefined && frame.method !== undefined) {
-      await this.#answer(frame.id, frame.method, frame.params);
+      void this.#answer(frame.id, frame.method, frame.params);
       return;
     }
     if (frame.method !== undefined) {
