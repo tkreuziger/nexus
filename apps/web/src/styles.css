@@ -1,4 +1,5 @@
 :root {
+  color-scheme: light dark;
   --bg: #ffffff;
   --surface: #f6f6f8;
   --border: #d8d8de;
@@ -317,10 +318,16 @@ a {
   align-items: center;
 }
 
+/* WCAG 2.2 target size: an inline link needs at least a 24x24 box, and bare text is only ~18 tall. */
+.main a:not(.button) {
+  display: inline-block;
+  padding: 3px 0;
+}
+
 .crumb {
   font: inherit;
   font-size: 13px;
-  padding: 2px 4px;
+  padding: 4px 6px;
   border: 0;
   border-radius: 4px;
   background: none;
@@ -448,4 +455,40 @@ input {
 
 .login-card .button {
   margin-top: 8px;
+}
+
+/* A phone-sized viewport: the topbar is brand + nav + account and does not fit on one line. */
+@media (max-width: 480px) {
+  .topbar {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    padding: 8px 12px;
+  }
+
+  .topbar-end {
+    gap: 8px;
+  }
+
+  .nav {
+    order: 3;
+    width: 100%;
+  }
+
+  .main {
+    padding: 16px 12px 40px;
+  }
+
+  /* Comfortable to tap, without inflating the desktop layout. */
+  .button {
+    padding: 9px 14px;
+  }
+
+  .facts {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .facts dd {
+    margin-bottom: 6px;
+  }
 }

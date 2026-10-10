@@ -1,6 +1,16 @@
 import { statSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 
+/** Types Bun does not infer from the extension but a browser will not accept without. */
+const CONTENT_TYPES: Record<string, string> = {
+  ".webmanifest": "application/manifest+json",
+};
+
+const contentTypeFor = (path: string): string | undefined => {
+  const dot = path.lastIndexOf(".");
+  return dot === -1 ? undefined : CONTENT_TYPES[path.slice(dot)];
+};
+
 const isInside = (root: string, candidate: string): boolean =>
   candidate === root || candidate.startsWith(root.endsWith(sep) ? root : `${root}${sep}`);
 
@@ -33,5 +43,9 @@ export async function serveWebApp(root: string, request: Request): Promise<Respo
   const candidate = resolve(root, relative.replace(/^\/+/, ""));
   if (!isInside(root, candidate)) return indexResponse(root);
   if (statSync(candidate, { throwIfNoEntry: false })?.isFile() !== true) return indexResponse(root);
-  return new Response(Bun.file(candidate));
+  const override = contentTypeFor(candidate);
+  const file = Bun.file(candidate);
+  return override === undefined
+    ? new Response(file)
+    : new Response(file, { headers: { "content-type": override } });
 }

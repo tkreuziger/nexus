@@ -119,6 +119,7 @@ export function SessionsPage(): ReactElement {
           id="session-model"
           value={model}
           placeholder="provider:modelId — defaults to NEXUS_DEFAULT_MODEL"
+          aria-describedby={formError === null ? undefined : "session-model-error"}
           onChange={(event) => setModel(event.target.value)}
         />
         <label htmlFor="session-base">Base ref (optional)</label>
@@ -129,7 +130,7 @@ export function SessionsPage(): ReactElement {
           onChange={(event) => setBaseRef(event.target.value)}
         />
         {formError === null ? null : (
-          <p className="error" role="alert">
+          <p className="error" id="session-model-error" role="alert">
             {formError}
           </p>
         )}

@@ -13,6 +13,7 @@ import { createUser } from "../../src/store/users.ts";
 
 const INDEX = "<!doctype html><title>nexus</title>";
 const ASSET = "console.log('app');";
+const MANIFEST = '{"name":"nexus"}';
 
 let db: Database;
 let app: (request: Request) => Promise<Response>;
@@ -64,6 +65,7 @@ beforeEach(async () => {
   mkdirSync(join(webDir, "assets"), { recursive: true });
   writeFileSync(join(webDir, "index.html"), INDEX);
   writeFileSync(join(webDir, "assets", "app.js"), ASSET);
+  writeFileSync(join(webDir, "manifest.webmanifest"), MANIFEST);
   await boot(base, webDir);
   token = (await createUser(db, "owner", "s3cret")).token;
 });
@@ -100,6 +102,14 @@ describe("static web app", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("javascript");
     expect(await response.text()).toBe(ASSET);
+  });
+
+  test("serves the manifest as a manifest, not an octet stream", async () => {
+    // Bun does not infer a type for `.webmanifest`, and a browser refuses one it cannot read.
+    const response = await webGet("/manifest.webmanifest");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("application/manifest+json");
+    expect(await response.text()).toBe(MANIFEST);
   });
 
   test("serves the API under its prefix and requires a token", async () => {
