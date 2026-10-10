@@ -51,6 +51,9 @@ export function ProjectDetailPage(): ReactElement {
         </p>
         <h1>{detail.name}</h1>
         <p className="muted mono">{detail.path}</p>
+        <p>
+          <Link to={`/projects/${id}/sessions`}>Sessions →</Link>
+        </p>
       </div>
 
       <div className="card stack">

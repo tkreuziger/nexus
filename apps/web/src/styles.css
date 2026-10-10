@@ -8,6 +8,7 @@
   --accent-fg: #ffffff;
   --error: #b3261e;
   --warning: #8a5a00;
+  --success: #1f6f43;
   --radius: 6px;
   --gap: 16px;
 }
@@ -23,6 +24,7 @@
     --accent-fg: #10101a;
     --error: #f2857c;
     --warning: #e0b062;
+    --success: #6fca8f;
   }
 }
 
@@ -194,6 +196,54 @@ a {
 .tag.warn {
   color: var(--warning);
   border-color: var(--warning);
+}
+
+.tag.live {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.tag.ok {
+  color: var(--success);
+  border-color: var(--success);
+}
+
+.tag.bad {
+  color: var(--error);
+  border-color: var(--error);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 14px;
+  margin: 0;
+}
+
+.facts dt {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.facts dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.notice {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--error);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.button.danger {
+  color: var(--error);
+  border-color: var(--error);
 }
 
 .crumbs {
