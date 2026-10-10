@@ -126,7 +126,7 @@ a {
 .main {
   flex: 1;
   width: 100%;
-  max-width: 900px;
+  max-width: 1080px;
   margin: 0 auto;
   padding: 24px 20px 48px;
 }
@@ -312,6 +312,96 @@ a {
   resize: vertical;
 }
 
+/* Project frame: a sidebar of sections beside the section itself. */
+
+.project {
+  display: grid;
+  grid-template-columns: minmax(0, 190px) minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+
+.sidebar {
+  position: sticky;
+  top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sidebar-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar-title {
+  font-weight: 500;
+}
+
+.sidebar-path {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-nav a {
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.sidebar-nav a:hover {
+  background: var(--surface);
+}
+
+.sidebar-nav a[aria-current="page"] {
+  background: var(--surface);
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.commit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  align-items: baseline;
+}
+
+.commit .grow {
+  flex: 1 1 220px;
+}
+
+/* A modal on the native dialog element; the backdrop is the only part worth styling. */
+
+.modal {
+  width: min(540px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.modal::backdrop {
+  background: rgb(0 0 0 / 0.45);
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
 .crumbs {
   display: flex;
   flex-wrap: wrap;
@@ -455,6 +545,27 @@ input {
 
 .login-card .button {
   margin-top: 8px;
+}
+
+/* Below a tablet width the sidebar stacks above the section, so its nav runs across. */
+@media (max-width: 720px) {
+  .project {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .sidebar {
+    position: static;
+    /* The nav runs across here, so a rule keeps it distinct from the section below it. */
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sidebar-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
 }
 
 /* A phone-sized viewport: the topbar is brand + nav + account and does not fit on one line. */

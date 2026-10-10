@@ -1,17 +1,10 @@
-import type { CreateSessionRequest } from "@nexus/client";
 import { ApiError } from "@nexus/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type FormEvent, type ReactElement, useState } from "react";
+import { type ReactElement, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api.ts";
-
-const STATUS_CLASS: Record<string, string> = {
-  running: "tag live",
-  idle: "tag ok",
-  crashed: "tag bad",
-  stopped: "tag",
-  starting: "tag",
-};
+import { NewSessionDialog } from "../components/NewSessionDialog.tsx";
+import { SESSION_STATUS_CLASS } from "../status.ts";
 
 export function SessionsPage(): ReactElement {
   const { id = "" } = useParams();
@@ -25,37 +18,11 @@ export function SessionsPage(): ReactElement {
   });
   const project = useQuery({ queryKey: ["project", id], queryFn: () => api.getProject(id) });
 
-  const [name, setName] = useState("");
-  const [provider, setProvider] = useState("");
-  const [modelId, setModelId] = useState("");
-  const [baseRef, setBaseRef] = useState("");
-  const [formError, setFormError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   const [confirmForce, setConfirmForce] = useState<string | null>(null);
-
-  const providers = useQuery({ queryKey: ["providers"], queryFn: () => api.listProviders() });
-  // Only providers with something to choose, so the picker cannot lead to an empty list.
-  const selectable = (providers.data?.providers ?? []).filter((entry) => entry.modelCount > 0);
-  const modelList = useQuery({
-    queryKey: ["provider-models", provider],
-    queryFn: () => api.listProviderModels(provider),
-    enabled: provider !== "",
-  });
-  const chosenModel = (modelList.data?.models ?? []).find((entry) => entry.id === modelId);
 
   const invalidate = (): Promise<void> =>
     queryClient.invalidateQueries({ queryKey: ["sessions", id] });
-
-  const create = useMutation({
-    mutationFn: (body: CreateSessionRequest) => api.createSession(id, body),
-    onSuccess: async () => {
-      setName("");
-      setProvider("");
-      setModelId("");
-      setBaseRef("");
-      setFormError(null);
-      await invalidate();
-    },
-  });
 
   const restart = useMutation({
     mutationFn: (sessionId: string) => api.restartSession(sessionId),
@@ -75,227 +42,115 @@ export function SessionsPage(): ReactElement {
     },
   });
 
-  const submit = (event: FormEvent<HTMLFormElement>): void => {
-    event.preventDefault();
-    const body: CreateSessionRequest = { name };
-    if (provider !== "") {
-      if (modelId === "") {
-        setFormError("Choose a model, or clear the provider to use the server default.");
-        return;
-      }
-      body.model = { provider, modelId };
-    }
-    if (baseRef !== "") body.baseRef = baseRef;
-    setFormError(null);
-    create.mutate(body);
-  };
-
   const unassigned =
     project.status === "success" && project.data.project.assignedAuthMethodId === null;
 
   return (
     <section className="stack-lg">
-      <div>
-        <p className="muted">
-          <Link to={`/projects/${id}`}>
-            ← {project.status === "success" ? project.data.project.name : "Project"}
-          </Link>
-        </p>
-        <h1>Sessions</h1>
-        <p className="muted">
-          Each session gets its own worktree and its own harness process, so two sessions on one
-          project cannot interfere.
-        </p>
+      <div className="row">
+        <h1 className="grow">Sessions</h1>
+        <button type="button" className="button primary" onClick={() => setCreating(true)}>
+          New session
+        </button>
       </div>
 
       {unassigned ? (
         <p className="error" role="alert">
           This project has no assigned auth method, so sessions cannot start.{" "}
-          <Link to={`/projects/${id}`}>Assign one</Link>.
+          <Link to={`/projects/${id}/settings`}>Assign one</Link>.
         </p>
       ) : null}
 
-      <form className="card stack" onSubmit={submit}>
-        <h2 className="section-title">Create a session</h2>
-        <label htmlFor="session-name">Name</label>
-        <input
-          id="session-name"
-          value={name}
-          placeholder="alpha"
-          onChange={(event) => setName(event.target.value)}
-          required
-        />
-        <label htmlFor="session-provider">Model provider (optional)</label>
-        <select
-          id="session-provider"
-          value={provider}
-          disabled={providers.isPending}
-          aria-describedby={formError === null ? undefined : "session-model-error"}
-          onChange={(event) => {
-            setProvider(event.target.value);
-            setModelId("");
-          }}
-        >
-          <option value="">{providers.isPending ? "Loading providers…" : "Server default"}</option>
-          {selectable.map((entry) => (
-            <option key={entry.id} value={entry.id}>
-              {entry.name} ({entry.modelCount})
-            </option>
-          ))}
-        </select>
-        {providers.status === "error" ? (
-          <p className="error" role="alert">
-            {providers.error.message}
-          </p>
-        ) : null}
+      {sessions.status === "pending" ? <p className="muted">Loading…</p> : null}
+      {sessions.status === "error" ? (
+        <p className="error" role="alert">
+          {sessions.error.message}
+        </p>
+      ) : null}
+      {sessions.status === "success" ? (
+        sessions.data.sessions.length === 0 ? (
+          <p className="muted">No sessions yet.</p>
+        ) : (
+          <ul className="list">
+            {sessions.data.sessions.map((session) => (
+              <li key={session.id} className="card stack">
+                <div className="row">
+                  <span className="row-title grow">{session.name}</span>
+                  <span className={SESSION_STATUS_CLASS[session.status]}>{session.status}</span>
+                </div>
+                <dl className="facts">
+                  <dt>Branch</dt>
+                  <dd className="mono">{session.branch}</dd>
+                  <dt>Base</dt>
+                  <dd className="mono">{session.baseRef}</dd>
+                  <dt>Model</dt>
+                  <dd className="mono">
+                    {session.model.provider}:{session.model.modelId}
+                  </dd>
+                  <dt>Process</dt>
+                  <dd className="mono">{session.pid === null ? "—" : session.pid}</dd>
+                  <dt>Worktree</dt>
+                  <dd className="mono">{session.worktreePath}</dd>
+                </dl>
 
-        {provider === "" ? null : (
-          <>
-            <label htmlFor="session-model">Model</label>
-            <select
-              id="session-model"
-              value={modelId}
-              disabled={modelList.isPending}
-              onChange={(event) => setModelId(event.target.value)}
-            >
-              <option value="">{modelList.isPending ? "Loading models…" : "Choose a model"}</option>
-              {(modelList.data?.models ?? []).map((entry) => (
-                <option key={entry.id} value={entry.id}>
-                  {entry.name}
-                </option>
-              ))}
-            </select>
-            {chosenModel === undefined ? null : (
-              <p className="muted">
-                {chosenModel.contextWindow.toLocaleString()} token context · up to{" "}
-                {chosenModel.maxTokens.toLocaleString()} out
-                {chosenModel.reasoning ? " · reasoning" : ""} · ${chosenModel.cost.input}/$
-                {chosenModel.cost.output} per million tokens
-              </p>
-            )}
-            {modelList.status === "error" ? (
-              <p className="error" role="alert">
-                {modelList.error.message}
-              </p>
-            ) : null}
-          </>
-        )}
-        <label htmlFor="session-base">Base ref (optional)</label>
-        <input
-          id="session-base"
-          value={baseRef}
-          placeholder="HEAD"
-          onChange={(event) => setBaseRef(event.target.value)}
-        />
-        {formError === null ? null : (
-          <p className="error" id="session-model-error" role="alert">
-            {formError}
-          </p>
-        )}
-        {create.error === null ? null : (
-          <p className="error" role="alert">
-            {create.error.message}
-          </p>
-        )}
-        <div>
-          <button type="submit" className="button primary" disabled={create.isPending}>
-            {create.isPending ? "Creating…" : "Create"}
-          </button>
-        </div>
-      </form>
-
-      <div>
-        <h2 className="section-title">Existing</h2>
-        {sessions.status === "pending" ? <p className="muted">Loading…</p> : null}
-        {sessions.status === "error" ? (
-          <p className="error" role="alert">
-            {sessions.error.message}
-          </p>
-        ) : null}
-        {sessions.status === "success" ? (
-          sessions.data.sessions.length === 0 ? (
-            <p className="muted">No sessions yet.</p>
-          ) : (
-            <ul className="list">
-              {sessions.data.sessions.map((session) => (
-                <li key={session.id} className="card stack">
-                  <div className="row">
-                    <span className="row-title grow">{session.name}</span>
-                    <span className={STATUS_CLASS[session.status] ?? "tag"}>{session.status}</span>
-                  </div>
-                  <dl className="facts">
-                    <dt>Branch</dt>
-                    <dd className="mono">{session.branch}</dd>
-                    <dt>Base</dt>
-                    <dd className="mono">{session.baseRef}</dd>
-                    <dt>Model</dt>
-                    <dd className="mono">
-                      {session.model.provider}:{session.model.modelId}
-                    </dd>
-                    <dt>Process</dt>
-                    <dd className="mono">{session.pid === null ? "—" : session.pid}</dd>
-                    <dt>Worktree</dt>
-                    <dd className="mono">{session.worktreePath}</dd>
-                  </dl>
-
-                  {confirmForce === session.id ? (
-                    <div className="notice">
-                      <p className="error" role="alert">
-                        The worktree holds uncommitted work. Deleting discards it. The branch is
-                        kept.
-                      </p>
-                      <div className="row">
-                        <button
-                          type="button"
-                          className="button danger"
-                          disabled={remove.isPending}
-                          onClick={() => remove.mutate({ sessionId: session.id, force: true })}
-                        >
-                          Discard and delete
-                        </button>
-                        <button
-                          type="button"
-                          className="button"
-                          onClick={() => setConfirmForce(null)}
-                        >
-                          Keep it
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
+                {confirmForce === session.id ? (
+                  <div className="notice">
+                    <p className="error" role="alert">
+                      The worktree holds uncommitted work. Deleting discards it. The branch is kept.
+                    </p>
                     <div className="row">
-                      <Link className="button" to={`/sessions/${session.id}`}>
-                        Open
-                      </Link>
-                      <button
-                        type="button"
-                        className="button"
-                        disabled={restart.isPending}
-                        onClick={() => restart.mutate(session.id)}
-                      >
-                        Restart
-                      </button>
                       <button
                         type="button"
                         className="button danger"
                         disabled={remove.isPending}
-                        onClick={() => remove.mutate({ sessionId: session.id, force: false })}
+                        onClick={() => remove.mutate({ sessionId: session.id, force: true })}
                       >
-                        Delete
+                        Discard and delete
+                      </button>
+                      <button
+                        type="button"
+                        className="button"
+                        onClick={() => setConfirmForce(null)}
+                      >
+                        Keep it
                       </button>
                     </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )
-        ) : null}
-        {remove.error !== null && confirmForce === null ? (
-          <p className="error" role="alert">
-            {remove.error.message}
-          </p>
-        ) : null}
-      </div>
+                  </div>
+                ) : (
+                  <div className="row">
+                    <Link className="button" to={`/sessions/${session.id}`}>
+                      Open
+                    </Link>
+                    <button
+                      type="button"
+                      className="button"
+                      disabled={restart.isPending}
+                      onClick={() => restart.mutate(session.id)}
+                    >
+                      Restart
+                    </button>
+                    <button
+                      type="button"
+                      className="button danger"
+                      disabled={remove.isPending}
+                      onClick={() => remove.mutate({ sessionId: session.id, force: false })}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )
+      ) : null}
+      {remove.error !== null && confirmForce === null ? (
+        <p className="error" role="alert">
+          {remove.error.message}
+        </p>
+      ) : null}
+
+      <NewSessionDialog projectId={id} open={creating} onClose={() => setCreating(false)} />
     </section>
   );
 }

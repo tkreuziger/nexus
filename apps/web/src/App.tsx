@@ -3,9 +3,13 @@ import { QueryCache, QueryClient, QueryClientProvider, useQuery } from "@tanstac
 import { type ReactElement, useCallback, useEffect, useRef, useState } from "react";
 import { Navigate, NavLink, Route, Routes } from "react-router-dom";
 import { api, setToken } from "./api.ts";
+import { ProjectLayout } from "./layouts/ProjectLayout.tsx";
 import { AuthMethodsPage } from "./pages/AuthMethodsPage.tsx";
 import { LoginScreen } from "./pages/LoginScreen.tsx";
-import { ProjectDetailPage } from "./pages/ProjectDetailPage.tsx";
+import { ProjectFilesPage } from "./pages/ProjectFilesPage.tsx";
+import { ProjectGitPage } from "./pages/ProjectGitPage.tsx";
+import { ProjectOverviewPage } from "./pages/ProjectOverviewPage.tsx";
+import { ProjectSettingsPage } from "./pages/ProjectSettingsPage.tsx";
 import { ProjectsPage } from "./pages/ProjectsPage.tsx";
 import { SessionsPage } from "./pages/SessionsPage.tsx";
 import { SessionViewPage } from "./pages/SessionViewPage.tsx";
@@ -79,10 +83,15 @@ function AppShell({ onSignOut }: { onSignOut: () => void }): ReactElement {
       <main className="main">
         <Routes>
           <Route path="/" element={<ProjectsPage />} />
-          <Route path="/projects/:id" element={<ProjectDetailPage />} />
-          <Route path="/projects/:id/sessions" element={<SessionsPage />} />
-          <Route path="/sessions/:id" element={<SessionViewPage />} />
           <Route path="/auth-methods" element={<AuthMethodsPage />} />
+          <Route path="/projects/:id" element={<ProjectLayout />}>
+            <Route index element={<ProjectOverviewPage />} />
+            <Route path="git" element={<ProjectGitPage />} />
+            <Route path="files" element={<ProjectFilesPage />} />
+            <Route path="sessions" element={<SessionsPage />} />
+            <Route path="settings" element={<ProjectSettingsPage />} />
+          </Route>
+          <Route path="/sessions/:id" element={<SessionViewPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
