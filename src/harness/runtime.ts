@@ -7,6 +7,7 @@ import { CodingTools } from "@earendil-works/pi-durable/tools";
 import { buildModels } from "../models.ts";
 import type { ModelRef } from "../types.ts";
 import { openBunSqliteDatabase } from "./bun-sqlite.ts";
+import { createSkillsExtension } from "./skills.ts";
 
 /** An open Pi Durable conversation plus the storage it owns. */
 export interface SessionRuntime {
@@ -28,6 +29,7 @@ export async function openSessionRuntime(input: SessionRuntimeInput): Promise<Se
   const storage = await SqliteStorage.open(openBunSqliteDatabase(input.dbPath));
   const registry = createRegistry();
   registry.install(CodingTools);
+  registry.install(createSkillsExtension());
   const models: Models = await buildModels(input.credentials);
   const harness = await Harness.open(
     storage,

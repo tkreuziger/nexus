@@ -50,13 +50,14 @@ On the first run the server creates a user `owner` and prints a bearer token **o
 | `NEXUS_PI_STORAGE_DIR` | `<dataDir>/sessions` | One Pi Durable SQLite file per session |
 | `NEXUS_LISTEN` | `127.0.0.1:8787` | `host:port` for `Bun.serve` |
 | `NEXUS_SECRET_KEY_FILE` | `<dataDir>/secret.key` | AES-256-GCM key, mode 0600, created on first run |
-| `NEXUS_DEFAULT_MODEL` | — | `provider:modelId` used when a session does not name one |
+| `NEXUS_DEFAULT_MODEL` | — | `provider:modelId` used when neither the session request nor the project's default names one |
 | `NEXUS_BOOTSTRAP_TOKEN` | random | Secret half of the first user's bearer token |
 | `NEXUS_WEB_DIR` | — | Directory holding the built web app; when set, unmatched `GET`s are served from it with an `index.html` fallback |
 | `NEXUS_SSE_HEARTBEAT_MS` | `20000` | Interval between `: keep-alive` comments on an event stream, which is what stops Bun closing an idle attachment |
 | `NEXUS_COMPACTION_RESERVE_TOKENS` | `16384` | Context headroom before a compaction is forced |
 | `NEXUS_COMPACTION_KEEP_RECENT_TOKENS` | `20000` | Roughly how much recent context stays verbatim |
 | `NEXUS_PROVIDERS_MODULE` | — | Module whose default export registers extra model providers; used for offline runs and tests |
+| `NEXUS_SKILLS_DIR` | — | Extra skill roots, `:`-separated, added to the Pi locations skills are discovered from |
 
 ## HTTP API
 
@@ -89,6 +90,16 @@ specific, instead of mid-turn.
 An auth method may only name a known provider, and only for an auth type that provider accepts. A
 session may only name a known model of a known provider.
 
+### Filesystem
+
+| Method | Path under `/api` | Notes |
+|---|---|---|
+| `GET` | `/fs/list?path=&limit=` | The immediate subdirectories of `path`, each with a `git` flag; `path` defaults to the server's home directory and a leading `~` expands to it. `422` when `path` is not a directory; `limit` defaults to 200 (max 500) |
+
+This exists only to autocomplete the path field when registering a project. It is read-only and, unlike
+the project and session routes, not owner-scoped: registering already accepts any path on the server's
+filesystem, so listing directory names grants no new capability.
+
 ### Projects
 
 | Method | Path under `/api` | Notes |
@@ -97,10 +108,12 @@ session may only name a known model of a known provider.
 | `GET` | `/projects` | The caller's projects |
 | `GET` | `/projects/:id` | Project metadata |
 | `GET` | `/projects/:id/content?path=` | Read-only listing or file text. `400` when the path escapes the project root |
+| `GET` | `/projects/:id/search?q=&limit=` | Read-only case-insensitive content search. Skips `.git`, `node_modules`, binaries, and files over 1 MiB; symlinks are not followed. `limit` defaults to 100 (max 500); `truncated` marks a capped result. `400` when `q` is empty |
 | `GET` | `/projects/:id/git/status` | Branch, dirty files, ahead/behind |
 | `GET` | `/projects/:id/git/log?limit=` | Recent commits |
 | `GET` | `/projects/:id/git/worktrees` | Linked worktrees |
 | `PUT` | `/projects/:id/auth-method` | `{ authMethodId }` or `{ authMethodId: null }` to unassign |
+| `PUT` | `/projects/:id/default-model` | `{ model: { provider, modelId } }` or `{ model: null }` to clear. Validated against the catalogue; a new session defaults to it when the request names no model |
 
 ### Auth methods
 
@@ -116,7 +129,7 @@ A project with no assigned auth method refuses to start a session with `400`.
 
 | Method | Path under `/api` | Notes |
 |---|---|---|
-| `POST` | `/projects/:id/sessions` | `{ name, model?, baseRef? }` — creates the worktree and spawns the harness. `409` on a duplicate name, `400` without an auth method |
+| `POST` | `/projects/:id/sessions` | `{ name, model?, baseRef? }` — creates the worktree and spawns the harness. `409` on a duplicate name, `400` without an auth method. The model is the request's, else the project's default, else `NEXUS_DEFAULT_MODEL` |
 | `GET` | `/projects/:id/sessions` | Sessions in a project |
 | `GET` | `/sessions/:id` | Session metadata, including `status`, `pid`, `worktreePath`, `branch` |
 | `DELETE` | `/sessions/:id?force=` | Stops the process, removes the worktree, deletes the session's records; preserves the branch |
@@ -148,6 +161,21 @@ A request handler never blocks the read loop, because the credential proxy issue
 - An auth method is either an API key or an OAuth token set, sealed with AES-256-GCM under a 0600 key file (`docs/architecture/adrs/0003-credential-encryption.md`).
 - The harness never receives credentials at spawn time. It implements Pi Durable's `CredentialStore` and proxies each call to the server, which decrypts on read and re-encrypts on write. OAuth refreshes therefore persist, and plaintext exists only inside the harness process (`docs/architecture/adrs/0002-credential-injection.md`).
 - A session may only see its project's assigned auth method, and only for the matching provider.
+
+## Skills
+
+Every session's agent discovers [Pi skills](https://agentskills.io/specification) from the locations `pi` itself uses, so a skill installed for the CLI is available to a session without copying it:
+
+- `~/.pi/agent/skills/` — the global root; `PI_CODING_AGENT_DIR` moves the agent directory it sits in
+- `~/.agents/skills/` — the shared convention, so skills installed for other harnesses work too
+- `<worktree>/.pi/skills/` and `<worktree>/.agents/skills/` — the session's worktree, so a project's committed skills travel with the branch it was created from
+- every root named in `NEXUS_SKILLS_DIR` (`:`-separated)
+
+Discovery, validation, and the prompt block are Pi's own loader, `@earendil-works/pi-coding-agent` (see `docs/architecture/adrs/0010-skills.md`). Only names and descriptions enter the system prompt; the model loads a skill's body through `read` when a task matches its description, exactly as `pi` does. The section is rendered before every request, so a skill added to a root is advertised on the next turn without restarting the session.
+
+The loader reports malformed skills on the harness's stderr (`journalctl -u nexus`) and skips them — a skill without a `description` is never advertised.
+
+A skill is instructions the model will follow and may include code it runs. Review skill content before installing it; a project's committed skills are exactly as trustworthy as the repository.
 
 ## Worktree layout
 

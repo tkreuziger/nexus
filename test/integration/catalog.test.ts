@@ -235,3 +235,47 @@ describe("validating against the catalogue", () => {
     created.push(body.session);
   }, 30_000);
 });
+
+describe("the project default model", () => {
+  const setDefault = (projectId: string, model: unknown) =>
+    call(`/projects/${projectId}/default-model`, {
+      method: "PUT",
+      body: JSON.stringify({ model }),
+    });
+
+  test("stores a default model on the project", async () => {
+    const projectId = await registerProject();
+    const response = await setDefault(projectId, { provider: "faux", modelId: "faux-1" });
+    expect(response.status).toBe(200);
+    const body = await jsonOf<{ project: { defaultModel: unknown } }>(response);
+    expect(body.project.defaultModel).toEqual({ provider: "faux", modelId: "faux-1" });
+  });
+
+  test("clears the default model with null", async () => {
+    const projectId = await registerProject();
+    await setDefault(projectId, { provider: "faux", modelId: "faux-1" });
+    const body = await jsonOf<{ project: { defaultModel: unknown } }>(
+      await setDefault(projectId, null),
+    );
+    expect(body.project.defaultModel).toBeNull();
+  });
+
+  test("refuses a default model the catalogue does not offer", async () => {
+    const projectId = await registerProject();
+    const response = await setDefault(projectId, { provider: "faux", modelId: "faux-9" });
+    expect(response.status).toBe(400);
+    expect((await jsonOf<{ error: { message: string } }>(response)).error.message).toBe(
+      'provider "faux" has no model "faux-9"',
+    );
+  });
+
+  test("a new session uses the project's default model", async () => {
+    const projectId = await readyProject();
+    await setDefault(projectId, { provider: "faux", modelId: "faux-1" });
+    const response = await createSession(projectId, { name: "defaulted" });
+    expect(response.status).toBe(201);
+    const body = await jsonOf<{ session: { id: SessionId; model: unknown } }>(response);
+    expect(body.session.model).toEqual({ provider: "faux", modelId: "faux-1" });
+    created.push(body.session.id);
+  }, 30_000);
+});

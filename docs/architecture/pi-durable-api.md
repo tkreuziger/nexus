@@ -93,6 +93,27 @@ const models = createModels({ credentials: myCredentialStore });
 
 **Gotcha:** `fauxAssistantMessage` defaults `stopReason: "stop"`, which generation treats as the final answer. Tool calls are only executed when the message carries `stopReason: "toolUse"`.
 
+## Skills
+
+Pi Durable has no skills module, so discovery and prompt formatting come from the CLI package, pinned at the same `1.1.0` (ADR-10). Both are root exports:
+
+```ts
+import { formatSkillsForPrompt, loadSkills } from "@earendil-works/pi-coding-agent";
+
+const { skills, diagnostics } = loadSkills({
+  cwd: worktreePath,
+  agentDir: "/root/.pi/agent",
+  skillPaths: ["/root/.agents/skills"],
+  includeDefaults: true,
+});
+const block = formatSkillsForPrompt(skills);   // prelude + <available_skills>, "" without skills
+```
+
+- `includeDefaults` adds `<agentDir>/skills` and `<cwd>/.pi/skills`; `skillPaths` adds any further root. A path that does not exist produces a warning, so only existing directories are passed.
+- `loadSkills` is synchronous (`node:fs`) and validating: a skill without a `description` is dropped with a diagnostic, an invalid `name` warns but still loads, a duplicate name keeps the first and warns, and symlinked duplicates are dropped by canonical path.
+- The block is installed as an untagged prompt section, rendered before every request, so the text the model sees is Pi's own.
+- Verified by execution: `test/unit/skills.test.ts` and `test/integration/skills.test.ts`, plus a probe in which the agent's `read` call returned a `SKILL.md` body from outside the worktree.
+
 ## Reproduction
 
 Probes used to establish the above (throwaway, under `/tmp/pidurable-probe`):

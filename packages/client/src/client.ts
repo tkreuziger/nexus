@@ -109,6 +109,22 @@ export class ApiClient {
     return this.#request("GET", `/projects/${encodeURIComponent(id)}/content?${query}`, options);
   }
 
+  searchProject(
+    id: string,
+    query: string,
+    limit?: number,
+    options: RequestOptions = {},
+  ): Promise<wire.SearchResponse> {
+    const params = new URLSearchParams({ q: query });
+    if (limit !== undefined) params.set("limit", String(limit));
+    return this.#request("GET", `/projects/${encodeURIComponent(id)}/search?${params}`, options);
+  }
+
+  /** Immediate subdirectories of `path` (the server's home directory when empty), for autocomplete. */
+  listFs(path = "", options: RequestOptions = {}): Promise<wire.ListFsResponse> {
+    return this.#request("GET", `/fs/list?${new URLSearchParams({ path })}`, options);
+  }
+
   getGitStatus(id: string, options: RequestOptions = {}): Promise<wire.GitStatusResponse> {
     return this.#request("GET", `/projects/${encodeURIComponent(id)}/git/status`, options);
   }
@@ -129,6 +145,16 @@ export class ApiClient {
   assignAuthMethod(projectId: string, authMethodId: string | null): Promise<wire.ProjectResponse> {
     const body: wire.AssignAuthMethodRequest = { authMethodId };
     return this.#request("PUT", `/projects/${encodeURIComponent(projectId)}/auth-method`, { body });
+  }
+
+  assignDefaultModel(
+    projectId: string,
+    model: wire.WireModelRef | null,
+  ): Promise<wire.ProjectResponse> {
+    const body: wire.AssignDefaultModelRequest = { model };
+    return this.#request("PUT", `/projects/${encodeURIComponent(projectId)}/default-model`, {
+      body,
+    });
   }
 
   /* Auth methods. */

@@ -10,6 +10,7 @@ import {
 } from "@nexus/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  type ChangeEvent,
   type FormEvent,
   type KeyboardEvent,
   type ReactElement,
@@ -24,6 +25,7 @@ import { api } from "../api.ts";
 import { CodeBlock } from "../components/CodeBlock.tsx";
 import { Markdown } from "../components/Markdown.tsx";
 import { Modal } from "../components/Modal.tsx";
+import { readDraft, writeDraft } from "../draft.ts";
 
 const STREAM_LABEL: Record<StreamState, string> = {
   connecting: "connecting…",
@@ -177,7 +179,19 @@ export function SessionViewPage(): ReactElement {
     return () => stream.stop();
   }, [id]);
 
-  const [text, setText] = useState("");
+  const [text, setText] = useState(() => readDraft(id));
+  // The draft is per session, so switching sessions without remounting loads the other one's text.
+  useEffect(() => {
+    setText(readDraft(id));
+  }, [id]);
+
+  const onTextChange = (event: ChangeEvent<HTMLTextAreaElement>): void => {
+    const value = event.target.value;
+    setText(value);
+    // Persist on every keystroke, so a reload or an accidental navigation keeps the draft.
+    writeDraft(id, value);
+  };
+
   // One id per draft. A send that fails and is retried repeats the id, and the server treats a repeat
   // as a no-op — so a retry cannot deliver the message twice. It only rolls over on success.
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
@@ -227,6 +241,7 @@ export function SessionViewPage(): ReactElement {
     mutationFn: () => api.submitMessage(id, { requestId, text }),
     onSuccess: async () => {
       setText("");
+      writeDraft(id, "");
       setRequestId(crypto.randomUUID());
       await queryClient.invalidateQueries({ queryKey: ["messages", id] });
     },
@@ -383,7 +398,7 @@ export function SessionViewPage(): ReactElement {
                 rows={1}
                 placeholder="Ask the agent to do something in its worktree"
                 aria-label="Prompt"
-                onChange={(event) => setText(event.target.value)}
+                onChange={onTextChange}
                 onKeyDown={onKeyDown}
               />
               <button
@@ -443,7 +458,7 @@ export function SessionViewPage(): ReactElement {
                 value={text}
                 placeholder="Ask the agent to do something in its worktree"
                 aria-label="Prompt"
-                onChange={(event) => setText(event.target.value)}
+                onChange={onTextChange}
                 onKeyDown={onKeyDown}
               />
               <div className="row">
