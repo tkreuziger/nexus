@@ -779,8 +779,13 @@ input {
     background: rgb(0 0 0 / 0.45);
   }
 
-  /* The drawer covers the section, so the section must not scroll underneath it. */
+  /* The drawer covers the section, so the section must not scroll underneath it. The app shell is a
+     fixed frame, so the scroll container is `.main` and locking the document alone is not enough. */
   body:has(.sidebar-scrim) {
+    overflow: hidden;
+  }
+
+  body:has(.sidebar-scrim) .main {
     overflow: hidden;
   }
 }
