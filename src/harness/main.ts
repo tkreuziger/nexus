@@ -70,6 +70,7 @@ async function handleInit(params: unknown): Promise<{ conversationId: string }> 
     cwd: init.cwd,
     model: init.model,
     credentials: createProxyCredentialStore(rpc),
+    compaction: init.compaction,
   });
   runtime.harness.resume();
   const pump = new EntryPump(runtime.root, (entry) => rpc.notify(HARNESS_METHODS.entry, { entry }));

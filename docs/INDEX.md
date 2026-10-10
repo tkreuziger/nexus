@@ -2,6 +2,10 @@
 
 Documentation index for the Pi Session Server (nexus).
 
+## Start here
+
+- `../README.md` — what the server does, configuration, the HTTP API, the IPC protocol, credentials, worktree layout, and the deletion policy.
+
 ## Plans
 
 - `plans/pi-session-server.md` — implementation plan: verified Pi Durable facts, architecture decisions, repo layout, milestones, and test plan.

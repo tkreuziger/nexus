@@ -20,6 +20,7 @@ export interface SessionRuntimeInput {
   cwd: string;
   model: ModelRef;
   credentials: CredentialStore;
+  compaction: { reserveTokens: number; keepRecentTokens: number };
 }
 
 /**
@@ -57,7 +58,14 @@ export async function openSessionRuntime(input: SessionRuntimeInput): Promise<Se
     {
       models: await buildModels(input.credentials),
       registry,
-      settings: { toolExecution: "parallel", compaction: { enabled: true } },
+      settings: {
+        toolExecution: "parallel",
+        compaction: {
+          enabled: true,
+          reserveTokens: input.compaction.reserveTokens,
+          keepRecentTokens: input.compaction.keepRecentTokens,
+        },
+      },
       env: (target) => new NodeExecutionEnv({ cwd: target.cwd ?? input.cwd }),
     },
     BACKGROUND_CONTEXT,

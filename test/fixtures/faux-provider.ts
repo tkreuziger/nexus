@@ -8,7 +8,16 @@ import { fauxAssistantMessage, fauxProvider } from "@earendil-works/pi-ai/provid
  */
 export default function registerFaux(models: MutableModels): void {
   const reply = process.env.NEXUS_FAUX_REPLY ?? "ok";
-  const faux = fauxProvider({ provider: "faux", models: [{ id: "faux-1" }] });
+  const contextWindow = Number(process.env.NEXUS_FAUX_CONTEXT_WINDOW ?? "");
+  const faux = fauxProvider({
+    provider: "faux",
+    models: [
+      {
+        id: "faux-1",
+        ...(Number.isFinite(contextWindow) && contextWindow > 0 ? { contextWindow } : {}),
+      },
+    ],
+  });
   models.setProvider(faux.provider);
   const step = () => {
     faux.appendResponses([step]);

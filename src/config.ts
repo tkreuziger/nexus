@@ -2,6 +2,12 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import type { ModelRef } from "./types.ts";
 
+/** Compaction thresholds handed to each harness process (Pi Durable's defaults unless overridden). */
+export interface CompactionConfig {
+  reserveTokens: number;
+  keepRecentTokens: number;
+}
+
 /** Server configuration, read once at boot from the environment (§6.3). */
 export interface Config {
   projectsRoot: string;
@@ -13,6 +19,7 @@ export interface Config {
   secretKeyFile: string;
   defaultModel: ModelRef | null;
   bootstrapToken: string | null;
+  compaction: CompactionConfig;
 }
 
 function parseListen(value: string | undefined): Config["listen"] {
@@ -35,6 +42,15 @@ function parseModel(value: string | undefined): ModelRef | null {
   return { provider: value.slice(0, separator), modelId: value.slice(separator + 1) };
 }
 
+function parsePositiveInt(value: string | undefined, fallback: number, name: string): number {
+  if (value === undefined || value === "") return fallback;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error(`${name} must be a non-negative integer, got "${value}"`);
+  }
+  return parsed;
+}
+
 /** Read configuration from `env`, applying defaults and validating the values that are present. */
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
   const dataDir = resolve(env.NEXUS_DATA_DIR ?? join(homedir(), ".nexus"));
@@ -48,5 +64,17 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     secretKeyFile: resolve(env.NEXUS_SECRET_KEY_FILE ?? join(dataDir, "secret.key")),
     defaultModel: parseModel(env.NEXUS_DEFAULT_MODEL),
     bootstrapToken: env.NEXUS_BOOTSTRAP_TOKEN ?? null,
+    compaction: {
+      reserveTokens: parsePositiveInt(
+        env.NEXUS_COMPACTION_RESERVE_TOKENS,
+        16_384,
+        "NEXUS_COMPACTION_RESERVE_TOKENS",
+      ),
+      keepRecentTokens: parsePositiveInt(
+        env.NEXUS_COMPACTION_KEEP_RECENT_TOKENS,
+        20_000,
+        "NEXUS_COMPACTION_KEEP_RECENT_TOKENS",
+      ),
+    },
   };
 }

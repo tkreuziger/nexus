@@ -31,6 +31,7 @@ export interface InitParams {
   dbPath: string;
   model: ModelRef;
   authMethodId: string | null;
+  compaction: { reserveTokens: number; keepRecentTokens: number };
 }
 
 export interface InitResult {
