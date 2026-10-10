@@ -321,22 +321,19 @@ a {
   align-items: start;
 }
 
+/* The sidebar keeps its column on a wide viewport, so the bar that opens it and the scrim that
+   closes it are only real below the drawer width. */
+.project-bar,
+.sidebar-scrim {
+  display: none;
+}
+
 .sidebar {
   position: sticky;
   top: 20px;
   display: flex;
   flex-direction: column;
   gap: 14px;
-}
-
-.sidebar-head {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.sidebar-title {
-  font-weight: 500;
 }
 
 .sidebar-path {
@@ -547,24 +544,77 @@ input {
   margin-top: 8px;
 }
 
-/* Below a tablet width the sidebar stacks above the section, so its nav runs across. */
+/* Below the drawer width the sidebar leaves the grid and slides in over the section, so the section
+   keeps the full width and the hamburger in the project bar is what reaches the sections. */
 @media (max-width: 720px) {
   .project {
     grid-template-columns: minmax(0, 1fr);
     gap: 16px;
   }
 
-  .sidebar {
-    position: static;
-    /* The nav runs across here, so a rule keeps it distinct from the section below it. */
-    padding-bottom: 10px;
-    border-bottom: 1px solid var(--border);
+  .project-bar {
+    display: flex;
   }
 
-  .sidebar-nav {
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 4px;
+  .sidebar-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 20;
+    width: min(80vw, 280px);
+    padding: 16px;
+    overflow-y: auto;
+    background: var(--bg);
+    border-right: 1px solid var(--border);
+    /* Hidden rather than merely off-canvas: a translated box still holds its links in the tab order. */
+    visibility: hidden;
+    transform: translateX(-100%);
+    transition:
+      transform 0.2s ease,
+      visibility 0s 0.2s;
+  }
+
+  .sidebar[data-open="true"] {
+    visibility: visible;
+    transform: none;
+    transition: transform 0.2s ease;
+  }
+
+  .sidebar-nav a {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  .sidebar-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 15;
+    padding: 0;
+    border: 0;
+    background: rgb(0 0 0 / 0.45);
+  }
+
+  /* The drawer covers the section, so the section must not scroll underneath it. */
+  body:has(.sidebar-scrim) {
+    overflow: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The open state is a more specific selector, so it has to be named to lose its transition too. */
+  .sidebar,
+  .sidebar[data-open="true"] {
+    transition: none;
   }
 }
 
