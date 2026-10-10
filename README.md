@@ -173,6 +173,8 @@ NEXUS_WEB_DIR=apps/web/dist bun run src/server/main.ts
 
 Log in with the `owner` handle and the secret behind the bootstrap token. `@nexus/client` holds the wire contract the server and every frontend share, so a breaking change fails `tsc` rather than reaching a browser.
 
+A web manifest and icons ship with the app, so it can be added to a home screen with a name, an icon, and a standalone window. Installing it as an app additionally needs a service worker, which does not exist yet — that is the next step for the PWA path, not a missing piece of this one.
+
 ## Development
 
 ```bash

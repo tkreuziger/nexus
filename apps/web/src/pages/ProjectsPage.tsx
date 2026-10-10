@@ -39,6 +39,7 @@ export function ProjectsPage(): ReactElement {
           id="project-path"
           value={path}
           placeholder="/home/you/code/thing"
+          aria-describedby={register.error === null ? undefined : "project-path-error"}
           onChange={(event) => setPath(event.target.value)}
           required
         />
@@ -50,7 +51,7 @@ export function ProjectsPage(): ReactElement {
           onChange={(event) => setName(event.target.value)}
         />
         {register.error === null ? null : (
-          <p className="error" role="alert">
+          <p className="error" id="project-path-error" role="alert">
             {register.error.message}
           </p>
         )}
