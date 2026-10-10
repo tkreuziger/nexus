@@ -50,6 +50,45 @@ function formatUsage(usage: LiveState["usage"]): string | null {
   return `${input.toLocaleString()} in / ${output.toLocaleString()} out`;
 }
 
+/** The maximize glyph for the prompt's pop-out control. */
+function MaximizeIcon(): ReactElement {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="14"
+      height="14"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <polyline points="15 3 21 3 21 9" />
+      <polyline points="9 21 3 21 3 15" />
+      <line x1="21" y1="3" x2="14" y2="10" />
+      <line x1="3" y1="21" x2="10" y2="14" />
+    </svg>
+  );
+}
+
+/**
+ * How to send, as key caps rather than spelled-out words. Shown where a keyboard is present; a touch
+ * screen gets the Send button instead (see `.send-touch`).
+ */
+function SendHint(): ReactElement {
+  return (
+    <span className="muted grow send-hint">
+      <kbd>⌘</kbd>
+      <span>/</span>
+      <kbd>Ctrl</kbd>
+      <span>+</span>
+      <kbd>⏎</kbd>
+      <span>to send prompt</span>
+    </span>
+  );
+}
+
 function Row({
   messageRole,
   content,
@@ -336,16 +375,27 @@ export function SessionViewPage(): ReactElement {
       <footer className="chat-foot">
         <div className="chat-col chat-foot-col">
           <form className="stack composer" onSubmit={submit}>
-            <textarea
-              ref={composerRef}
-              className="composer-input"
-              value={text}
-              rows={1}
-              placeholder="Ask the agent to do something in its worktree"
-              aria-label="Prompt"
-              onChange={(event) => setText(event.target.value)}
-              onKeyDown={onKeyDown}
-            />
+            <div className="composer-field">
+              <textarea
+                ref={composerRef}
+                className="composer-input"
+                value={text}
+                rows={1}
+                placeholder="Ask the agent to do something in its worktree"
+                aria-label="Prompt"
+                onChange={(event) => setText(event.target.value)}
+                onKeyDown={onKeyDown}
+              />
+              <button
+                type="button"
+                className="composer-expand"
+                aria-label="Open the prompt in a large editor"
+                title="Open in a large editor"
+                onClick={() => setExpanded(true)}
+              >
+                <MaximizeIcon />
+              </button>
+            </div>
             {send.error === null ? null : (
               <p className="error" role="alert">
                 {send.error.message}
@@ -362,15 +412,7 @@ export function SessionViewPage(): ReactElement {
                   Abort
                 </button>
               ) : null}
-              <span className="muted grow send-hint">⌘/Ctrl + Enter to send prompt</span>
-              <button
-                type="button"
-                className="button ghost"
-                aria-label="Open the prompt in a large editor"
-                onClick={() => setExpanded(true)}
-              >
-                Expand
-              </button>
+              <SendHint />
               {/* A touch screen has no ⌘/Ctrl key, so the shortcut gives way to a button. */}
               <button
                 type="submit"
@@ -405,7 +447,7 @@ export function SessionViewPage(): ReactElement {
                 onKeyDown={onKeyDown}
               />
               <div className="row">
-                <span className="muted grow send-hint">⌘/Ctrl + Enter to send prompt</span>
+                <SendHint />
                 <button
                   type="button"
                   className="button primary send-touch"
