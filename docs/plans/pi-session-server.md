@@ -2,6 +2,12 @@
 
 Implementation plan for the durable agent session control plane specified in `INPUT.md`: projects, auth methods, worktree-isolated Pi Durable sessions, and an attachable event surface.
 
+## Status
+
+- **M1 complete** — project registry, read-only content API, read-only git state, bearer auth. 47 tests pass; type checker and linter clean; verified against a running server.
+- M2 next — one session, IPC, and event streaming.
+- ADR-1 … ADR-7 written at `docs/architecture/adrs/`.
+
 ## Context
 
 Greenfield repository (`/home/tristan/code/projects/nexus`), single commit-less `main`, only `INPUT.md` present. Deliverable is a TypeScript-on-Bun HTTP control plane that supervises per-session Pi Durable harness processes. Related: `INPUT.md` (requirements), `docs/architecture/pi-durable-api.md` (verified API surface), `docs/architecture/adrs/` (decision records).
