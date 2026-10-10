@@ -99,7 +99,9 @@ describe("credentialHandlers", () => {
         "SELECT credential_ciphertext FROM auth_methods WHERE id = ?",
       )
       .get(id);
-    expect(row?.credential_ciphertext).not.toContain("r2");
+    // The whole JSON cannot appear in base64, whose alphabet excludes `{`, `"` and `:`.
+    expect(row?.credential_ciphertext).not.toContain(JSON.stringify(rotated));
+    expect(row?.credential_ciphertext?.startsWith("v1.")).toBe(true);
   });
 
   test("lists only the assigned method's metadata", async () => {
