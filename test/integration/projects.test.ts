@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { API_PREFIX } from "@nexus/client";
+import { ModelCatalog } from "../../src/catalog.ts";
 import type { Config } from "../../src/config.ts";
 import { loadOrCreateKey } from "../../src/crypto/secrets.ts";
 import { runGit } from "../../src/projects/git.ts";
@@ -77,6 +78,7 @@ beforeEach(async () => {
     config,
     supervisor: new SessionSupervisor(db, config, secretKey),
     secretKey,
+    catalog: new ModelCatalog(),
   });
   token = (await createUser(db, "owner", "secret-one")).token;
   otherToken = (await createUser(db, "intruder", "secret-two")).token;

@@ -73,6 +73,19 @@ export class ApiClient {
     return this.#request("GET", "/me", options);
   }
 
+  /* The provider and model catalogue. */
+
+  listProviders(options: RequestOptions = {}): Promise<wire.ListProvidersResponse> {
+    return this.#request("GET", "/providers", options);
+  }
+
+  listProviderModels(
+    providerId: string,
+    options: RequestOptions = {},
+  ): Promise<wire.ListModelsResponse> {
+    return this.#request("GET", `/providers/${encodeURIComponent(providerId)}/models`, options);
+  }
+
   /* Projects. */
 
   listProjects(options: RequestOptions = {}): Promise<wire.ListProjectsResponse> {

@@ -1,5 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { ModelCatalog } from "../catalog.ts";
 import { loadConfig } from "../config.ts";
 import { loadOrCreateKey } from "../crypto/secrets.ts";
 import { SessionSupervisor } from "../sessions/supervisor.ts";
@@ -29,6 +30,18 @@ async function main(): Promise<void> {
   const supervisor = new SessionSupervisor(db, config, secretKey);
   supervisor.reconcile();
 
+  // Built at boot so a broken NEXUS_PROVIDERS_MODULE stops the server rather than the first session.
+  const catalog = new ModelCatalog();
+  await catalog.load();
+  if (
+    config.defaultModel !== null &&
+    (await catalog.model(config.defaultModel.provider, config.defaultModel.modelId)) === undefined
+  ) {
+    console.warn(
+      `nexus: NEXUS_DEFAULT_MODEL "${config.defaultModel.provider}:${config.defaultModel.modelId}" is not a model this Pi knows`,
+    );
+  }
+
   const bootstrapToken = await ensureBootstrapUser(db, config.bootstrapToken);
   if (bootstrapToken !== null) {
     console.log(`nexus: created user "owner". bearer token (shown once):\n  ${bootstrapToken}`);
@@ -40,7 +53,7 @@ async function main(): Promise<void> {
     // Bun closes a connection idle for longer than this. An event stream is idle between turns, so
     // the timeout is raised well above the stream's heartbeat interval.
     idleTimeout: 120,
-    fetch: createApp({ db, config, supervisor, secretKey }),
+    fetch: createApp({ db, config, supervisor, secretKey, catalog }),
   });
   console.log(`nexus: listening on http://${server.hostname}:${server.port}`);
   console.log(`nexus: projects root ${config.projectsRoot}`);

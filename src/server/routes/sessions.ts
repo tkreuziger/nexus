@@ -8,6 +8,7 @@ import type {
   SessionResponse,
   SubmitMessageResponse,
 } from "@nexus/client";
+import type { ModelCatalog } from "../../catalog.ts";
 import type { Config } from "../../config.ts";
 import { HttpError } from "../../errors.ts";
 import { requireProject } from "../../projects/registry.ts";
@@ -28,6 +29,7 @@ export interface SessionDeps {
   db: Database;
   config: Config;
   supervisor: SessionSupervisor;
+  catalog: ModelCatalog;
 }
 
 function modelFrom(body: Record<string, unknown>): ModelRef | undefined {
@@ -134,6 +136,14 @@ export function sessionRoutes(deps: SessionDeps): readonly Route[] {
         const model = modelFrom(body) ?? deps.config.defaultModel;
         if (model === null) {
           throw new HttpError(400, "no model given and NEXUS_DEFAULT_MODEL is not set");
+        }
+        // A harness resolves the model against the same catalogue, so an unknown one would fail on the
+        // first request; refusing it here makes that failure immediate and specific.
+        if ((await deps.catalog.provider(model.provider)) === undefined) {
+          throw new HttpError(400, `unknown provider "${model.provider}"`);
+        }
+        if ((await deps.catalog.model(model.provider, model.modelId)) === undefined) {
+          throw new HttpError(400, `provider "${model.provider}" has no model "${model.modelId}"`);
         }
         const session = await deps.supervisor.create(project, {
           name: requiredString(body, "name"),

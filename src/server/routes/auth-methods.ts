@@ -6,6 +6,7 @@ import type {
   ProjectResponse,
   WireAuthMethod,
 } from "@nexus/client";
+import type { ModelCatalog } from "../../catalog.ts";
 import { parseCredentialInput } from "../../credentials.ts";
 import { encryptSecret } from "../../crypto/secrets.ts";
 import { HttpError } from "../../errors.ts";
@@ -24,6 +25,7 @@ import { jsonResponse, optionalString, readJsonObject, requiredString } from "..
 export interface AuthDeps {
   db: Database;
   secretKey: CryptoKey;
+  catalog: ModelCatalog;
 }
 
 /** Strip the credential: the wire contract never carries secret material. */
@@ -65,11 +67,20 @@ export function authMethodRoutes(deps: AuthDeps): readonly Route[] {
         const body = await readJsonObject(request);
         const credential = parseCredentialInput(body);
         const type = credential.type as AuthMethodType;
+        const provider = requiredString(body, "provider");
+        // Pi owns the provider list. Refusing an unknown name, or an auth type the provider does not
+        // accept, keeps a typo from becoming a session that fails on its first request.
+        if ((await deps.catalog.provider(provider)) === undefined) {
+          throw new HttpError(400, `unknown provider "${provider}"`);
+        }
+        if (!(await deps.catalog.supports(provider, type))) {
+          throw new HttpError(400, `provider "${provider}" does not accept ${type} auth`);
+        }
         const method = insertAuthMethod(scope.db, {
           userId: scope.user.id,
           type,
-          provider: requiredString(body, "provider"),
-          label: optionalString(body, "label") ?? requiredString(body, "provider"),
+          provider,
+          label: optionalString(body, "label") ?? provider,
           credentialCiphertext: await encryptSecret(deps.secretKey, JSON.stringify(credential)),
         });
         return jsonResponse<CreateAuthMethodResponse>({ authMethod: publicView(method) }, 201);

@@ -1,6 +1,8 @@
 node_modules/
 worktrees/
 data/
+# A data directory created in the working directory by a relative NEXUS_DATA_DIR.
+.nexus/
 dist/
 *.sqlite
 *.sqlite-wal
