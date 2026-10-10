@@ -197,7 +197,7 @@ A web manifest and icons ship with the app, so it can be added to a home screen 
 
 ```sh
 bun install
-bun run web:build              # apps/web/dist — restart the unit after this
+bun run web:build              # apps/web/dist — served live, no restart needed
 install -m 0644 deploy/nexus.service /etc/systemd/system/nexus.service
 systemctl daemon-reload && systemctl enable --now nexus
 
@@ -216,7 +216,9 @@ Three things the unit settles that are easy to get wrong:
 - **The first boot prints the credential.** With `NEXUS_BOOTSTRAP_TOKEN` unset the server creates user `owner` with a random secret and logs the bearer token once — `journalctl -u nexus | grep -A1 'bearer token'`. The login form wants the *secret* (the last `_`-separated part); the curl and the web client want the whole token.
 - **`flushpackets=on` is what makes the vhost stream.** Without it `mod_proxy_http` buffers, and `GET /api/sessions/:id/events` arrives in one lump when the turn ends instead of incrementally — the web app's live view then looks broken while the API is fine. `ProxyTimeout` is set well above the stream's 20s heartbeat.
 
-The unit's `WorkingDirectory` is the checkout itself: the server reads its own sources at start, but serves `NEXUS_WEB_DIR` from disk on every request, so rebuilding the bundle without `systemctl restart nexus` pairs a fresh client with a stale server.
+The unit's `WorkingDirectory` is the checkout itself, and the two halves reload differently: the server reads its own sources once at start, so a change under `src/` or `packages/` needs `systemctl restart nexus`, while `NEXUS_WEB_DIR` is re-read from disk on every request, so `bun run web:build` is live on the next page load with no restart at all. That asymmetry is the trap — a rebuilt bundle against an unrestarted server pairs a fresh client with a stale API. (A browser may also still hold the previous `index.html`; the hashed asset names change, so a reload is enough.)
+
+For iteration, `bun run dev` (server with `--watch`) and `bun run web:dev` (Vite on 5173, proxying `/api`) are the fast path. Stop `nexus.service` first or point `NEXUS_LISTEN` at another port: a dev run inherits no `NEXUS_*` from the unit, so it would also default to `~/.nexus` and `~/nexus-projects` rather than the deployed state.
 
 ## Development
 
