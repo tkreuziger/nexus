@@ -4,7 +4,17 @@ Implementation plan for a browser frontend over the session server, structured s
 
 ## Status
 
-- **W0–W6 planned**, not started. Nothing in this document is built yet.
+- **W0 complete** — Bun workspaces, `@nexus/client` with the wire contract, the HTTP client, and the SSE reader; the server's route handlers are annotated with the package's types.
+- **W1 complete** — `POST /login` and `GET /me`, an explicit `auth: "none"` route discriminant, secrets with an underscore refused, and `NEXUS_WEB_DIR` serving with an `index.html` fallback.
+- **W2 complete** — the Vite + React shell, login, the project list, and `401` clearing the stored token.
+- **W3 complete** — project registration, detail with git state and a read-only file browser, and auth-method management with assignment.
+- **W4 complete** — session create, list, restart, and delete with the `409` → force flow.
+- **W5 complete** — the live conversation view: mirror transcript plus stream overlay, streaming text and tool output, usage, abort, reconnect, and a crashed session recovered from the UI.
+- **W6 complete** — an accessibility pass measured on the rendering, narrow layouts, and a web manifest with icons.
+
+180 tests pass; type checker and linter clean; the app builds.
+
+Four bugs were found by verifying against a running system rather than by testing, and each is now pinned by a test: Bun closing idle event streams after ten seconds, a crashed session keeping its streams open forever, the abort button reading a polled status that lags a turn, and `fetch` called with the wrong receiver (which only a browser rejects).
 
 ## Context
 
