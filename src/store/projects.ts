@@ -62,3 +62,9 @@ export function findProjectByPath(db: Database, path: string): Project | undefin
   const row = db.query<ProjectRow, [string]>("SELECT * FROM projects WHERE path = ?").get(path);
   return row === null ? undefined : toProject(row);
 }
+
+/** Look up a project by id without an owner check, for server-internal orchestration. */
+export function getProjectById(db: Database, id: ProjectId): Project | undefined {
+  const row = db.query<ProjectRow, [string]>("SELECT * FROM projects WHERE id = ?").get(id);
+  return row === null ? undefined : toProject(row);
+}

@@ -1,14 +1,17 @@
 import type { Database } from "bun:sqlite";
 import type { Config } from "../config.ts";
 import { HttpError } from "../errors.ts";
+import type { SessionSupervisor } from "../sessions/supervisor.ts";
 import type { RequestScope, Route } from "./contract.ts";
 import { resolveUser } from "./principal.ts";
 import { matchPath } from "./router.ts";
 import { projectRoutes } from "./routes/projects.ts";
+import { sessionRoutes } from "./routes/sessions.ts";
 
 export interface AppDeps {
   db: Database;
   config: Config;
+  supervisor: SessionSupervisor;
 }
 
 const errorResponse = (status: number, message: string) =>
@@ -30,7 +33,7 @@ async function route(routes: readonly Route[], deps: AppDeps, request: Request):
 
 /** Build the request handler: routing, authentication, and the JSON error envelope. */
 export function createApp(deps: AppDeps): (request: Request) => Promise<Response> {
-  const routes: readonly Route[] = [...projectRoutes];
+  const routes: readonly Route[] = [...projectRoutes, ...sessionRoutes(deps)];
   return async (request) => {
     try {
       return await route(routes, deps, request);

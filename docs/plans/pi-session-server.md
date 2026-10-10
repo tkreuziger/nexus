@@ -4,8 +4,9 @@ Implementation plan for the durable agent session control plane specified in `IN
 
 ## Status
 
-- **M1 complete** — project registry, read-only content API, read-only git state, bearer auth. 47 tests pass; type checker and linter clean; verified against a running server.
-- M2 next — one session, IPC, and event streaming.
+- **M1 complete** — project registry, read-only content API, read-only git state, bearer auth.
+- **M2 complete** — harness process, stdio IPC, session lifecycle, SSE event stream, message mirror, crash/restart, boot-time reconciliation. 77 tests pass; type checker and linter clean; verified against a running server.
+- M3 next — worktree per session, deletion semantics.
 - ADR-1 … ADR-7 written at `docs/architecture/adrs/`.
 
 ## Context
