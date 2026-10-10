@@ -44,6 +44,7 @@ beforeEach(async () => {
     branch: "pi/alpha",
     baseRef: "HEAD",
     model: { provider: "faux", modelId: "faux-1" },
+    thinkingLevel: "off",
     conversationId: null,
     status: "idle",
     pid: null,

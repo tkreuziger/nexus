@@ -2,6 +2,7 @@ import { createInterface } from "node:readline";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { type AgentEventStream, watchEvents } from "@earendil-works/pi-durable";
 import {
+  asConfigureParams,
   asInitParams,
   asSubmitParams,
   asSubscribeParams,
@@ -69,6 +70,7 @@ async function handleInit(params: unknown): Promise<{ conversationId: string }> 
     dbPath: init.dbPath,
     cwd: init.cwd,
     model: init.model,
+    thinkingLevel: init.thinkingLevel,
     credentials: createProxyCredentialStore(rpc),
     compaction: init.compaction,
   });
@@ -92,6 +94,13 @@ async function handleSubmit(params: unknown): Promise<{ submissionId: string; st
 }
 
 rpc.onRequest(SERVER_METHODS.init, handleInit);
+// Pi Durable applies a change to the next request, not the one in flight, so a mid-turn change is
+// safe: it lands on the following turn rather than disturbing the answer being written.
+rpc.onRequest(SERVER_METHODS.configure, async (params) => {
+  const { model, thinkingLevel } = asConfigureParams(params);
+  await requireSession().runtime.root.configure({ model, thinkingLevel }, BACKGROUND_CONTEXT);
+  return {};
+});
 rpc.onRequest(SERVER_METHODS.submit, handleSubmit);
 rpc.onRequest(SERVER_METHODS.subscribe, async (params) => {
   const { subscriptionId } = asSubscribeParams(params);

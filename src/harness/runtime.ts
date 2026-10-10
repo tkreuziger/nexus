@@ -5,7 +5,7 @@ import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { SqliteStorage } from "@earendil-works/pi-durable/storage/sqlite";
 import { CodingTools } from "@earendil-works/pi-durable/tools";
 import { buildModels } from "../models.ts";
-import type { ModelRef } from "../types.ts";
+import type { ModelRef, ThinkingLevel } from "../types.ts";
 import { openBunSqliteDatabase } from "./bun-sqlite.ts";
 import { createSkillsExtension } from "./skills.ts";
 
@@ -20,6 +20,7 @@ export interface SessionRuntimeInput {
   dbPath: string;
   cwd: string;
   model: ModelRef;
+  thinkingLevel: ThinkingLevel;
   credentials: CredentialStore;
   compaction: { reserveTokens: number; keepRecentTokens: number };
 }
@@ -49,7 +50,7 @@ export async function openSessionRuntime(input: SessionRuntimeInput): Promise<Se
     BACKGROUND_CONTEXT,
   );
   const root = await harness.root(BACKGROUND_CONTEXT, {
-    agent: { model: input.model, cwd: input.cwd },
+    agent: { model: input.model, thinkingLevel: input.thinkingLevel, cwd: input.cwd },
   });
   return {
     harness,

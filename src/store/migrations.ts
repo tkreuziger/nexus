@@ -89,6 +89,11 @@ export const MIGRATIONS: readonly Migration[] = [
       `ALTER TABLE projects ADD COLUMN default_model_id TEXT`,
     ],
   },
+  {
+    version: 5,
+    // Null for every existing row; the store reads null as "off", which is what they were doing.
+    statements: [`ALTER TABLE sessions ADD COLUMN thinking_level TEXT`],
+  },
 ];
 
 /** Apply every migration newer than the database's `user_version`. */

@@ -13,6 +13,14 @@ export type AuthMethodType = "api_key" | "oauth";
 export type SessionStatus = "starting" | "idle" | "running" | "stopped" | "crashed";
 export type MessageRole = "user" | "assistant" | "tool" | "meta";
 
+/**
+ * Pi's reasoning-effort levels. `off` is the absence of thinking rather than a level of it, which is
+ * why it leads rather than trails. The array is here, not only the type, because a client has to
+ * render the choices and the server has to validate against them.
+ */
+export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
+export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
+
 export interface WireUser {
   id: string;
   handle: string;
@@ -54,6 +62,8 @@ export interface WireSession {
   branch: string;
   baseRef: string;
   model: WireModelRef;
+  /** How hard the model is asked to think before answering; `off` means it is not. */
+  thinkingLevel: ThinkingLevel;
   conversationId: string | null;
   status: SessionStatus;
   pid: number | null;
@@ -199,6 +209,12 @@ export interface CreateSessionRequest {
   baseRef?: string;
 }
 
+/** Both fields are required: the settings dialog always knows what it is setting them to. */
+export interface ConfigureSessionRequest {
+  model: WireModelRef;
+  thinkingLevel: ThinkingLevel;
+}
+
 export interface SubmitMessageRequest {
   /** Stable per submission. Repeating it is a no-op, which makes a retry safe. */
   requestId: string;
@@ -296,6 +312,16 @@ export interface SubmitMessageResponse {
 
 export interface AbortedResponse {
   aborted: true;
+}
+
+/**
+ * The worktree files a `@` mention completes against, relative to the worktree root and always
+ * slash-separated. Fetched whole and filtered in the browser, so typing does not re-walk the tree.
+ */
+export interface ListSessionFilesResponse {
+  files: string[];
+  /** True when the server's cap stopped the walk, so the worktree holds more than this. */
+  truncated: boolean;
 }
 
 export interface ListProvidersResponse {

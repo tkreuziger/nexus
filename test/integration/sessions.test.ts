@@ -549,3 +549,80 @@ describe("worktree isolation", () => {
     expect(mirrored.messages.map((message) => message.role)).toEqual(["user", "assistant"]);
   }, 30_000);
 });
+
+describe("session files and settings", () => {
+  const sessionOf = async (id: SessionId) =>
+    jsonOf<{
+      session: {
+        worktreePath: string;
+        thinkingLevel: string;
+        model: { provider: string; modelId: string };
+      };
+    }>(await call(`/sessions/${id}`));
+
+  test("lists the worktree's files, skipping what is never source", async () => {
+    const projectId = await registerProject();
+    const id = await createSession(projectId);
+    await waitForStatus(id, "idle");
+
+    const { session } = await sessionOf(id);
+    // Real source, plus the two things a walk has to pass over: dependencies and the git dir.
+    mkdirSync(join(session.worktreePath, "src", "deep"), { recursive: true });
+    writeFileSync(join(session.worktreePath, "src", "deep", "thing.ts"), "export const x = 1;\n");
+    mkdirSync(join(session.worktreePath, "node_modules", "left-pad"), { recursive: true });
+    writeFileSync(
+      join(session.worktreePath, "node_modules", "left-pad", "index.js"),
+      "module.exports = 1;\n",
+    );
+
+    const body = await jsonOf<{ files: string[]; truncated: boolean }>(
+      await call(`/sessions/${id}/files`),
+    );
+    expect(body.truncated).toBe(false);
+    expect(body.files).toContain("README.md");
+    expect(body.files).toContain("src/deep/thing.ts");
+    expect(body.files.some((file) => file.includes("node_modules"))).toBe(false);
+    // In a worktree `.git` is a file, so skipping it by kind alone would leave it in the list.
+    expect(body.files).not.toContain(".git");
+  }, 30_000);
+
+  test("changes the model and thinking level, and refuses what Pi does not have", async () => {
+    const projectId = await registerProject();
+    const id = await createSession(projectId);
+    await waitForStatus(id, "idle");
+
+    const before = await sessionOf(id);
+    // A session starts with thinking off; the dialog is where it is turned up.
+    expect(before.session.thinkingLevel).toBe("off");
+
+    const body = JSON.stringify({
+      model: { provider: "faux", modelId: "faux-1" },
+      thinkingLevel: "high",
+    });
+    const updated = await jsonOf<{ session: { thinkingLevel: string } }>(
+      await call(`/sessions/${id}/settings`, { method: "POST", body }),
+    );
+    expect(updated.session.thinkingLevel).toBe("high");
+
+    // Persisted, not merely echoed: a restart reuses the stored value.
+    expect((await sessionOf(id)).session.thinkingLevel).toBe("high");
+
+    const badLevel = await call(`/sessions/${id}/settings`, {
+      method: "POST",
+      body: JSON.stringify({
+        model: { provider: "faux", modelId: "faux-1" },
+        thinkingLevel: "enormous",
+      }),
+    });
+    expect(badLevel.status).toBe(400);
+
+    const unknownProvider = await call(`/sessions/${id}/settings`, {
+      method: "POST",
+      body: JSON.stringify({
+        model: { provider: "nope", modelId: "nope-1" },
+        thinkingLevel: "off",
+      }),
+    });
+    expect(unknownProvider.status).toBe(400);
+  }, 30_000);
+});

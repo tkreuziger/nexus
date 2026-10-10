@@ -220,6 +220,19 @@ export class ApiClient {
     return this.#request("POST", `/sessions/${encodeURIComponent(id)}/abort`);
   }
 
+  /** Change the model and reasoning effort the session runs with. */
+  configureSession(id: string, body: wire.ConfigureSessionRequest): Promise<wire.SessionResponse> {
+    return this.#request("POST", `/sessions/${encodeURIComponent(id)}/settings`, { body });
+  }
+
+  /** Every file in the session's worktree, for `@` mention completion. */
+  listSessionFiles(
+    id: string,
+    options: RequestOptions = {},
+  ): Promise<wire.ListSessionFilesResponse> {
+    return this.#request("GET", `/sessions/${encodeURIComponent(id)}/files`, options);
+  }
+
   /** Open a self-healing event stream for a session, carrying this client's token. */
   openStream(
     sessionId: string,

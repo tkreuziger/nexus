@@ -569,6 +569,85 @@ a {
   color: var(--fg);
 }
 
+/* The gear for the session's settings, at the header's top right. */
+.chat-gear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.chat-gear:hover {
+  color: var(--fg);
+  background: var(--surface);
+}
+
+.chat-gear svg {
+  display: block;
+}
+
+/* Commands after `/` and worktree files after `@`, floating above the box that is being typed in. */
+.completions {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 5;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 280px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.18);
+}
+
+.completion {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.completion.is-selected {
+  background: var(--bg);
+}
+
+.completion-label {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.completion-detail {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+/* The characters the query matched, so a fuzzy row explains why it is in the list. */
+.completions mark {
+  background: none;
+  color: var(--accent);
+  font-weight: 600;
+}
+
 /* Project frame: a sidebar of sections beside the section itself. */
 
 .project {
@@ -680,6 +759,14 @@ a {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* The pop-out's prompt box: the same field, filling the dialog rather than growing to a cap. */
+.prompt-field {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
 }
 
 /* Fills the dialog rather than growing to a cap, so the whole box is the writing surface. */
