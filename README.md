@@ -52,13 +52,23 @@ On the first run the server creates a user `owner` and prints a bearer token **o
 | `NEXUS_SECRET_KEY_FILE` | `<dataDir>/secret.key` | AES-256-GCM key, mode 0600, created on first run |
 | `NEXUS_DEFAULT_MODEL` | — | `provider:modelId` used when a session does not name one |
 | `NEXUS_BOOTSTRAP_TOKEN` | random | Secret half of the first user's bearer token |
+| `NEXUS_WEB_DIR` | — | Directory holding the built web app; when set, unmatched `GET`s are served from it with an `index.html` fallback |
 | `NEXUS_COMPACTION_RESERVE_TOKENS` | `16384` | Context headroom before a compaction is forced |
 | `NEXUS_COMPACTION_KEEP_RECENT_TOKENS` | `20000` | Roughly how much recent context stays verbatim |
 | `NEXUS_PROVIDERS_MODULE` | — | Module whose default export registers extra model providers; used for offline runs and tests |
 
 ## HTTP API
 
-All routes require a bearer token and are scoped to the caller. Another user's project or session is a `404`, never a `403`.
+Every route requires a bearer token except `POST /login`, and every route is scoped to the caller. Another user's project or session is a `404`, never a `403`.
+
+### Identity
+
+| Method | Path | Notes |
+|---|---|---|
+| `POST` | `/login` | `{ handle, secret }` → `{ token, user }`. The only unauthenticated route; `401` on a bad handle or secret |
+| `GET` | `/me` | The authenticated user, so a client can validate a stored token |
+
+`POST /login` verifies the secret against its stored hash and reconstructs the bearer token, which is why the secret must not contain `_` (see `docs/architecture/adrs/0005-user-authentication.md`).
 
 ### Projects
 
@@ -142,6 +152,24 @@ A worktree holding uncommitted work is refused with `409`; pass `?force=true` to
 
 If a harness process dies, the session becomes `crashed` and its worktree is left untouched. `POST /sessions/:id/restart` spawns a new process over the same storage; Pi Durable resumes the interrupted run from its last committed checkpoint, and the mirror keeps the full history. Sessions left live by a previous server process are marked `crashed` at boot.
 
+## Web frontend
+
+`apps/web` is a browser frontend over this API: register projects, manage auth methods, create sessions, and watch a conversation stream live. It exists to exercise every route, so it is also the most complete test of the server.
+
+It shares the API's origin — no CORS anywhere (ADR-8). In development Vite proxies `/api` to the server; in production the server serves the built app.
+
+```bash
+# development: the API on 8787, Vite on 5173 proxying /api
+bun run dev
+cd apps/web && bun run dev
+
+# production: build, then point the server at the output
+cd apps/web && bun run build
+NEXUS_WEB_DIR=apps/web/dist bun run src/server/main.ts
+```
+
+Log in with the `owner` handle and the secret behind the bootstrap token. `@nexus/client` holds the wire contract the server and every frontend share, so a breaking change fails `tsc` rather than reaching a browser.
+
 ## Development
 
 ```bash
@@ -156,6 +184,7 @@ Integration tests run keyless: `test/fixtures/faux-provider.ts` is loaded into e
 ## Documentation
 
 - `docs/INDEX.md` — navigation
-- `docs/plans/pi-session-server.md` — implementation plan and milestone status
+- `docs/plans/pi-session-server.md` — the server's implementation plan and milestone status
+- `docs/plans/web-frontend.md` — the frontend plan
 - `docs/architecture/pi-durable-api.md` — the Pi Durable calls this project depends on, verified by execution
 - `docs/architecture/adrs/` — architecture decision records

@@ -19,6 +19,8 @@ export interface Config {
   secretKeyFile: string;
   defaultModel: ModelRef | null;
   bootstrapToken: string | null;
+  /** Directory holding the built web app. When set, unmatched GETs are served from it (ADR-8). */
+  webDir: string | null;
   compaction: CompactionConfig;
 }
 
@@ -64,6 +66,10 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     secretKeyFile: resolve(env.NEXUS_SECRET_KEY_FILE ?? join(dataDir, "secret.key")),
     defaultModel: parseModel(env.NEXUS_DEFAULT_MODEL),
     bootstrapToken: env.NEXUS_BOOTSTRAP_TOKEN ?? null,
+    webDir:
+      env.NEXUS_WEB_DIR === undefined || env.NEXUS_WEB_DIR === ""
+        ? null
+        : resolve(env.NEXUS_WEB_DIR),
     compaction: {
       reserveTokens: parsePositiveInt(
         env.NEXUS_COMPACTION_RESERVE_TOKENS,
