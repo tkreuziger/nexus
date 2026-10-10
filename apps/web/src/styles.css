@@ -663,12 +663,20 @@ a {
 /* The prompt's pop-out: as close to the full viewport as a dialog can be and still keep its margins. */
 .modal-large {
   width: min(1200px, calc(100vw - 32px));
-  height: calc(100vh - 32px);
-  max-height: calc(100vh - 32px);
+  height: min(820px, calc(100vh - 96px));
+  max-height: calc(100vh - 96px);
+}
+
+/* The head takes a row and the body takes the rest. The dialog becomes a flex column only while it
+   is open, so the UA's `dialog:not([open]) { display: none }` still hides it when closed. */
+.modal-large[open] {
+  display: flex;
+  flex-direction: column;
 }
 
 .prompt-modal {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
