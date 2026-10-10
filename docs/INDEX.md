@@ -8,7 +8,8 @@ Documentation index for the Pi Session Server (nexus).
 
 ## Plans
 
-- `plans/pi-session-server.md` — implementation plan: verified Pi Durable facts, architecture decisions, repo layout, milestones, and test plan.
+- `plans/pi-session-server.md` — implementation plan: verified Pi Durable facts, architecture decisions, repo layout, milestones, and test plan. Complete.
+- `plans/web-frontend.md` — browser frontend plan: workspace layout, the shared `@nexus/client` contract, the mirror-versus-stream rendering model, the server changes it needs, and milestones W0–W6.
 
 ## Architecture
 
