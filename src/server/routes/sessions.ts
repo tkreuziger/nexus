@@ -59,14 +59,20 @@ function sseResponse(session: Session, deps: SessionDeps, request: Request): Res
   let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
   let closed = false;
   let detach: (() => void) | undefined;
+  let heartbeat: ReturnType<typeof setInterval> | undefined;
   const send = (event: unknown) => {
     if (closed || controller === undefined) return;
     controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
   };
+  /** Stop everything this stream started. `clearInterval` tolerates an absent handle. */
+  const teardown = () => {
+    clearInterval(heartbeat);
+    detach?.();
+  };
   const finish = () => {
     if (closed) return;
     closed = true;
-    detach?.();
+    teardown();
     controller?.close();
   };
   const stream = new ReadableStream<Uint8Array>({
@@ -78,19 +84,27 @@ function sseResponse(session: Session, deps: SessionDeps, request: Request): Res
         return;
       }
       const unsubscribeStatus = hub.subscribeStatus(send);
+      const unsubscribeClose = hub.subscribeClose(finish);
       const subscription = await deps.supervisor.subscribe(session.id, (events) => {
         for (const event of events) send(event);
       });
       detach = () => {
         unsubscribeStatus();
+        unsubscribeClose();
         subscription.release();
       };
+      // Bun closes a connection that stays idle, and a conversation can sit quiet for minutes. A
+      // comment frame is not an event, so clients skip it — but it keeps the attachment alive.
+      heartbeat = setInterval(() => {
+        if (closed || controller === undefined) return;
+        controller.enqueue(encoder.encode(": keep-alive\n\n"));
+      }, deps.config.sseHeartbeatMs);
       request.signal.addEventListener("abort", finish);
     },
     // The reader cancelling already tears the stream down; closing the controller here is invalid.
     cancel() {
       closed = true;
-      detach?.();
+      teardown();
     },
   });
   return new Response(stream, {

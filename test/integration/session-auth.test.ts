@@ -49,6 +49,7 @@ beforeEach(async () => {
     defaultModel: null,
     bootstrapToken: null,
     webDir: null,
+    sseHeartbeatMs: 50,
     compaction: { reserveTokens: 16_384, keepRecentTokens: 20_000 },
   };
   const secretKey = await loadOrCreateKey(config.secretKeyFile);

@@ -203,7 +203,9 @@ export class SessionSupervisor {
     running.client.close();
     running.child.kill();
     this.#running.delete(id);
+    running.hub.status = "stopped";
     setSessionStatus(this.db, id, "stopped", null);
+    running.hub.close();
   }
 
   /** Start the process again; Pi Durable resumes any run the previous process left unfinished. */
@@ -270,5 +272,7 @@ export class SessionSupervisor {
     this.#running.delete(id);
     running.hub.status = "crashed";
     setSessionStatus(this.db, id, "crashed", null);
+    // Nothing more will be reported for this session, so attached streams end rather than linger.
+    running.hub.close();
   }
 }

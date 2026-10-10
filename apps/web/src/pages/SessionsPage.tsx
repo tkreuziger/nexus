@@ -205,6 +205,9 @@ export function SessionsPage(): ReactElement {
                     </div>
                   ) : (
                     <div className="row">
+                      <Link className="button" to={`/sessions/${session.id}`}>
+                        Open
+                      </Link>
                       <button
                         type="button"
                         className="button"

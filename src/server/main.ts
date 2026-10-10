@@ -37,6 +37,9 @@ async function main(): Promise<void> {
   const server = Bun.serve({
     hostname: config.listen.host,
     port: config.listen.port,
+    // Bun closes a connection idle for longer than this. An event stream is idle between turns, so
+    // the timeout is raised well above the stream's heartbeat interval.
+    idleTimeout: 120,
     fetch: createApp({ db, config, supervisor, secretKey }),
   });
   console.log(`nexus: listening on http://${server.hostname}:${server.port}`);

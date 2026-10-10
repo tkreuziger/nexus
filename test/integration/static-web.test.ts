@@ -42,6 +42,7 @@ const buildConfig = (base: string, dir: string | null): Config => ({
   defaultModel: null,
   bootstrapToken: null,
   webDir: dir,
+  sseHeartbeatMs: 50,
   compaction: { reserveTokens: 16_384, keepRecentTokens: 20_000 },
 });
 
