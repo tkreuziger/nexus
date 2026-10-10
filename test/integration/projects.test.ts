@@ -4,8 +4,10 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Config } from "../../src/config.ts";
+import { loadOrCreateKey } from "../../src/crypto/secrets.ts";
 import { runGit } from "../../src/projects/git.ts";
 import { createApp } from "../../src/server/app.ts";
+import { SessionSupervisor } from "../../src/sessions/supervisor.ts";
 import { openStore } from "../../src/store/db.ts";
 import { createUser } from "../../src/store/users.ts";
 
@@ -64,7 +66,8 @@ beforeEach(async () => {
     defaultModel: null,
     bootstrapToken: null,
   };
-  app = createApp({ db, config });
+  const secretKey = await loadOrCreateKey(config.secretKeyFile);
+  app = createApp({ db, config, supervisor: new SessionSupervisor(db, config, secretKey) });
   token = (await createUser(db, "owner", "secret-one")).token;
   otherToken = (await createUser(db, "intruder", "secret-two")).token;
 });

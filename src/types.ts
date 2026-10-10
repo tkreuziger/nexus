@@ -43,6 +43,9 @@ export interface Session {
   worktreePath: string;
   branch: string;
   baseRef: string;
+  model: ModelRef;
+  /** Pi Durable's conversation id inside the session's own store; assigned at first init. */
+  conversationId: string | null;
   status: SessionStatus;
   pid: number | null;
   createdAt: string;
