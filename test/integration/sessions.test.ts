@@ -184,6 +184,7 @@ beforeEach(async () => {
     defaultModel: { provider: "faux", modelId: "faux-1" },
     bootstrapToken: null,
     webDir: null,
+    sseHeartbeatMs: 50,
     compaction: { reserveTokens: 16_384, keepRecentTokens: 20_000 },
   };
   const secretKey = await loadOrCreateKey(config.secretKeyFile);
@@ -283,6 +284,38 @@ describe("conversation interaction", () => {
     expect(mirrored[1]?.content).toContain("hello from faux");
   }, 30_000);
 
+  test("sends a keep-alive comment so an idle stream stays open", async () => {
+    const projectId = await registerProject();
+    const id = await createSession(projectId);
+    await waitForStatus(id, "idle");
+
+    const controller = new AbortController();
+    try {
+      const response = await app(
+        new Request(`http://localhost${API_PREFIX}/sessions/${id}/events`, {
+          headers: { authorization: `Bearer ${token}` },
+          signal: controller.signal,
+        }),
+      );
+      const body = response.body;
+      if (body === null) throw new Error("event stream has no body");
+      const reader = body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      // The test config sets a 50 ms heartbeat, so this needs no conversation activity at all.
+      const deadline = Date.now() + 5_000;
+      while (!buffer.includes(": keep-alive") && Date.now() < deadline) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+      }
+      await reader.cancel();
+      expect(buffer).toContain(": keep-alive");
+    } finally {
+      controller.abort();
+    }
+  }, 30_000);
+
   test("deduplicates a repeated request id", async () => {
     const projectId = await registerProject();
     const id = await createSession(projectId);
@@ -348,6 +381,51 @@ describe("conversation interaction", () => {
     const response = await call(`/sessions/${id}/events`);
     expect(response.status).toBe(409);
   }, 30_000);
+
+  test("ends an attached stream when the process dies", async () => {
+    const projectId = await registerProject();
+    const id = await createSession(projectId);
+    await waitForStatus(id, "idle");
+
+    const controller = new AbortController();
+    try {
+      const response = await app(
+        new Request(`http://localhost${API_PREFIX}/sessions/${id}/events`, {
+          headers: { authorization: `Bearer ${token}` },
+          signal: controller.signal,
+        }),
+      );
+      const body = response.body;
+      if (body === null) throw new Error("event stream has no body");
+      const reader = body.getReader();
+      const decoder = new TextDecoder();
+
+      // Read the opening frames, which proves the attachment exists.
+      let buffer = "";
+      while (!buffer.includes('"snapshot"')) {
+        const { value, done } = await reader.read();
+        if (done) throw new Error("stream ended before the snapshot");
+        buffer += decoder.decode(value, { stream: true });
+      }
+
+      const running = await jsonOf<{ session: { pid: number } }>(await call(`/sessions/${id}`));
+      process.kill(running.session.pid, "SIGKILL");
+
+      // The stream must end rather than linger: a client that kept reading a dead attachment would
+      // believe it was still live and never reconnect.
+      const deadline = Date.now() + 15_000;
+      let ended = false;
+      while (!ended && Date.now() < deadline) {
+        const { value, done } = await reader.read();
+        if (value !== undefined) buffer += decoder.decode(value, { stream: true });
+        ended = done;
+      }
+      expect(ended).toBe(true);
+      expect(buffer).toContain('"status":"crashed"');
+    } finally {
+      controller.abort();
+    }
+  }, 40_000);
 
   test("reports a crashed session and resumes it after a restart", async () => {
     const projectId = await registerProject();

@@ -53,6 +53,7 @@ On the first run the server creates a user `owner` and prints a bearer token **o
 | `NEXUS_DEFAULT_MODEL` | — | `provider:modelId` used when a session does not name one |
 | `NEXUS_BOOTSTRAP_TOKEN` | random | Secret half of the first user's bearer token |
 | `NEXUS_WEB_DIR` | — | Directory holding the built web app; when set, unmatched `GET`s are served from it with an `index.html` fallback |
+| `NEXUS_SSE_HEARTBEAT_MS` | `20000` | Interval between `: keep-alive` comments on an event stream, which is what stops Bun closing an idle attachment |
 | `NEXUS_COMPACTION_RESERVE_TOKENS` | `16384` | Context headroom before a compaction is forced |
 | `NEXUS_COMPACTION_KEEP_RECENT_TOKENS` | `20000` | Roughly how much recent context stays verbatim |
 | `NEXUS_PROVIDERS_MODULE` | — | Module whose default export registers extra model providers; used for offline runs and tests |

@@ -62,6 +62,8 @@ export interface StreamOptions {
   baseUrl?: string;
   token?: string | null;
   signal?: AbortSignal;
+  /** Called once the connection is established, before any frame. A stream can be silent for a while. */
+  onOpen?: () => void;
   /** Injectable for tests. */
   fetch?: FetchLike;
 }
@@ -93,6 +95,7 @@ export async function* readEventStream(
   if (response.status === 409) throw new StreamUnavailableError();
   if (!response.ok) throw await errorFromResponse(response);
   if (response.body === null) throw new ApiError(0, "event stream response has no body");
+  options.onOpen?.();
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -167,19 +170,19 @@ export class SessionStream {
     this.#setState(this.#attempt === 0 ? "connecting" : "reconnecting");
     const controller = new AbortController();
     this.#controller = controller;
-    let opened = false;
     try {
       const stream = readEventStream(this.#sessionId, {
         ...this.#options,
         signal: controller.signal,
+        // "open" means the connection is established. Waiting for a frame would leave a quiet session
+        // looking like it is still reconnecting.
+        onOpen: () => {
+          this.#attempt = 0;
+          this.#setState("open");
+        },
       });
       for await (const frame of stream) {
         if (this.#stopped) return;
-        if (!opened) {
-          opened = true;
-          this.#attempt = 0;
-          this.#setState("open");
-        }
         this.#options.onFrame(frame);
       }
       if (!this.#stopped) this.#retry();

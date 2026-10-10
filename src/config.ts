@@ -21,6 +21,11 @@ export interface Config {
   bootstrapToken: string | null;
   /** Directory holding the built web app. When set, unmatched GETs are served from it (ADR-8). */
   webDir: string | null;
+  /**
+   * Interval between `: keep-alive` comments on an event stream. A stream can sit idle for minutes,
+   * and Bun closes an idle connection, so a heartbeat is what keeps an attachment alive.
+   */
+  sseHeartbeatMs: number;
   compaction: CompactionConfig;
 }
 
@@ -70,6 +75,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       env.NEXUS_WEB_DIR === undefined || env.NEXUS_WEB_DIR === ""
         ? null
         : resolve(env.NEXUS_WEB_DIR),
+    sseHeartbeatMs: parsePositiveInt(env.NEXUS_SSE_HEARTBEAT_MS, 20_000, "NEXUS_SSE_HEARTBEAT_MS"),
     compaction: {
       reserveTokens: parsePositiveInt(
         env.NEXUS_COMPACTION_RESERVE_TOKENS,

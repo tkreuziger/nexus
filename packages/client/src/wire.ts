@@ -58,7 +58,7 @@ export interface WireSession {
   createdAt: string;
 }
 
-/** One mirrored transcript row. `content` is a JSON string holding `{ text, thinking?, toolCalls? }`. */
+/** One mirrored transcript row. `content` is a JSON string holding a `MirrorContent`. */
 export interface WireMessage {
   sessionId: string;
   sequence: number;
@@ -66,6 +66,17 @@ export interface WireMessage {
   role: MessageRole;
   content: string;
   createdAt: string;
+}
+
+/**
+ * The decoded form of `WireMessage.content`: the server's normalized, renderable payload. Kept in the
+ * contract because every client has to decode it to display a transcript.
+ */
+export interface MirrorContent {
+  text: string;
+  thinking?: string;
+  toolCalls?: { id: string; name: string; arguments: unknown }[];
+  toolName?: string;
 }
 
 export interface WireContentEntry {
