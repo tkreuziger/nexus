@@ -3,6 +3,8 @@ worktrees/
 data/
 # A data directory created in the working directory by a relative NEXUS_DATA_DIR.
 .nexus/
+# The server's default projects root, if a run resolves it relative to the working directory.
+nexus-projects/
 dist/
 *.sqlite
 *.sqlite-wal
