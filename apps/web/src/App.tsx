@@ -7,6 +7,7 @@ import { AuthMethodsPage } from "./pages/AuthMethodsPage.tsx";
 import { LoginScreen } from "./pages/LoginScreen.tsx";
 import { ProjectDetailPage } from "./pages/ProjectDetailPage.tsx";
 import { ProjectsPage } from "./pages/ProjectsPage.tsx";
+import { SessionsPage } from "./pages/SessionsPage.tsx";
 import { readToken } from "./token.ts";
 
 const isUnauthorized = (error: unknown): boolean =>
@@ -78,6 +79,7 @@ function AppShell({ onSignOut }: { onSignOut: () => void }): ReactElement {
         <Routes>
           <Route path="/" element={<ProjectsPage />} />
           <Route path="/projects/:id" element={<ProjectDetailPage />} />
+          <Route path="/projects/:id/sessions" element={<SessionsPage />} />
           <Route path="/auth-methods" element={<AuthMethodsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
