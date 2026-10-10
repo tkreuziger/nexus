@@ -3,7 +3,9 @@ import { QueryCache, QueryClient, QueryClientProvider, useQuery } from "@tanstac
 import { type ReactElement, useCallback, useEffect, useRef, useState } from "react";
 import { Navigate, NavLink, Route, Routes } from "react-router-dom";
 import { api, setToken } from "./api.ts";
+import { AuthMethodsPage } from "./pages/AuthMethodsPage.tsx";
 import { LoginScreen } from "./pages/LoginScreen.tsx";
+import { ProjectDetailPage } from "./pages/ProjectDetailPage.tsx";
 import { ProjectsPage } from "./pages/ProjectsPage.tsx";
 import { readToken } from "./token.ts";
 
@@ -63,6 +65,7 @@ function AppShell({ onSignOut }: { onSignOut: () => void }): ReactElement {
           <NavLink to="/" end>
             Projects
           </NavLink>
+          <NavLink to="/auth-methods">Auth methods</NavLink>
         </nav>
         <div className="topbar-end">
           {me.status === "success" ? <span className="muted">{me.data.user.handle}</span> : null}
@@ -74,6 +77,8 @@ function AppShell({ onSignOut }: { onSignOut: () => void }): ReactElement {
       <main className="main">
         <Routes>
           <Route path="/" element={<ProjectsPage />} />
+          <Route path="/projects/:id" element={<ProjectDetailPage />} />
+          <Route path="/auth-methods" element={<AuthMethodsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
