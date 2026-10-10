@@ -152,6 +152,33 @@ describe("project routes", () => {
     expect(response.status).toBe(400);
   });
 
+  test("searches file contents", async () => {
+    const path = await makeRepo("kappa");
+    const { body } = await register(path);
+    const response = await call(`/projects/${body.project.id}/search?q=hi`);
+    expect(response.status).toBe(200);
+    const payload = await jsonOf<{
+      matches: { path: string; line: number; column: number; text: string }[];
+      truncated: boolean;
+    }>(response);
+    expect(payload.truncated).toBe(false);
+    expect(payload.matches).toEqual([{ path: "README.md", line: 1, column: 3, text: "# hi" }]);
+  });
+
+  test("rejects a search without a query with 400", async () => {
+    const path = await makeRepo("lambda");
+    const { body } = await register(path);
+    const response = await call(`/projects/${body.project.id}/search`);
+    expect(response.status).toBe(400);
+  });
+
+  test("hides another user's project from search behind 404", async () => {
+    const path = await makeRepo("mu");
+    const { body } = await register(path);
+    const response = await call(`/projects/${body.project.id}/search?q=hi`, {}, otherToken);
+    expect(response.status).toBe(404);
+  });
+
   test("reports git status including dirty files", async () => {
     const path = await makeRepo("eta");
     const { body } = await register(path);
@@ -180,5 +207,42 @@ describe("project routes", () => {
     };
     expect(payload.worktrees).toHaveLength(1);
     expect(payload.worktrees[0]?.branch).toBe("main");
+  });
+});
+
+describe("filesystem autocomplete route", () => {
+  test("lists a directory's children and marks repositories", async () => {
+    await makeRepo("repo");
+    mkdirSync(join(base, "plain"));
+    const response = await call(`/fs/list?path=${encodeURIComponent(base)}`);
+    expect(response.status).toBe(200);
+    const payload = await jsonOf<{
+      path: string;
+      entries: { name: string; path: string; git: boolean }[];
+    }>(response);
+    expect(payload.entries).toEqual([
+      { name: "plain", path: join(payload.path, "plain"), git: false },
+      { name: "repo", path: join(payload.path, "repo"), git: true },
+    ]);
+  });
+
+  test("caps the listing at the requested limit", async () => {
+    await makeRepo("one");
+    await makeRepo("two");
+    const response = await call(`/fs/list?path=${encodeURIComponent(base)}&limit=1`);
+    const payload = await jsonOf<{ entries: unknown[] }>(response);
+    expect(payload.entries).toHaveLength(1);
+  });
+
+  test("rejects a missing directory with 422", async () => {
+    const response = await call(`/fs/list?path=${encodeURIComponent(join(base, "nope"))}`);
+    expect(response.status).toBe(422);
+  });
+
+  test("rejects an unauthenticated request with 401", async () => {
+    const response = await app(
+      new Request(`http://localhost${API_PREFIX}/fs/list?path=${encodeURIComponent(base)}`),
+    );
+    expect(response.status).toBe(401);
   });
 });

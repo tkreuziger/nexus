@@ -89,6 +89,21 @@ export type WireContent =
   | { kind: "directory"; path: string; entries: WireContentEntry[] }
   | { kind: "file"; path: string; size: number; text: string };
 
+/** One content match from a project search, with 1-based line and column. */
+export interface WireSearchMatch {
+  path: string;
+  line: number;
+  column: number;
+  text: string;
+}
+
+/** One directory offered as a path suggestion; `git` marks a directory that is a repository root. */
+export interface WireFsEntry {
+  name: string;
+  path: string;
+  git: boolean;
+}
+
 export interface WireGitStatus {
   branch: string;
   dirty: string[];
@@ -209,6 +224,18 @@ export interface ProjectResponse {
 
 export interface ContentResponse {
   content: WireContent;
+}
+
+/** `truncated` means the match cap stopped the search, so more matches may exist. */
+export interface SearchResponse {
+  matches: WireSearchMatch[];
+  truncated: boolean;
+}
+
+/** The immediate subdirectories of a path, for the registration path autocomplete. */
+export interface ListFsResponse {
+  path: string;
+  entries: WireFsEntry[];
 }
 
 export interface GitStatusResponse {
