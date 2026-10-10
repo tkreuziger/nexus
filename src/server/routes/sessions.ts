@@ -1,4 +1,13 @@
 import type { Database } from "bun:sqlite";
+import type {
+  AbortedResponse,
+  CreateSessionResponse,
+  DeleteSessionResponse,
+  ListSessionsResponse,
+  MessagesResponse,
+  SessionResponse,
+  SubmitMessageResponse,
+} from "@nexus/client";
 import type { Config } from "../../config.ts";
 import { HttpError } from "../../errors.ts";
 import { requireProject } from "../../projects/registry.ts";
@@ -7,16 +16,19 @@ import { listMessages } from "../../store/messages.ts";
 import { getProjectById } from "../../store/projects.ts";
 import type { ModelRef, ProjectId, Session, SessionId } from "../../types.ts";
 import type { RequestScope, Route } from "../contract.ts";
-import { boundedInt, optionalString, readJsonObject, requiredString } from "../json.ts";
+import {
+  boundedInt,
+  jsonResponse,
+  optionalString,
+  readJsonObject,
+  requiredString,
+} from "../json.ts";
 
 export interface SessionDeps {
   db: Database;
   config: Config;
   supervisor: SessionSupervisor;
 }
-
-const json = (body: unknown, status = 200): Response =>
-  Response.json(body, { status, headers: { "cache-control": "no-store" } });
 
 function modelFrom(body: Record<string, unknown>): ModelRef | undefined {
   const value = body.model;
@@ -114,7 +126,7 @@ export function sessionRoutes(deps: SessionDeps): readonly Route[] {
           model,
           baseRef: optionalString(body, "baseRef") ?? "HEAD",
         });
-        return json({ session }, 201);
+        return jsonResponse<CreateSessionResponse>({ session }, 201);
       },
     },
     {
@@ -122,13 +134,14 @@ export function sessionRoutes(deps: SessionDeps): readonly Route[] {
       path: "/projects/:id/sessions",
       handler: (scope) => {
         const project = requireProject(scope.db, scope.params.id as ProjectId, scope.user.id);
-        return json({ sessions: deps.supervisor.list(project.id) });
+        return jsonResponse<ListSessionsResponse>({ sessions: deps.supervisor.list(project.id) });
       },
     },
     {
       method: "GET",
       path: "/sessions/:id",
-      handler: (scope) => json({ session: requireOwnedSession(scope, deps) }),
+      handler: (scope) =>
+        jsonResponse<SessionResponse>({ session: requireOwnedSession(scope, deps) }),
     },
     {
       method: "GET",
@@ -136,7 +149,9 @@ export function sessionRoutes(deps: SessionDeps): readonly Route[] {
       handler: (scope, request) => {
         const session = requireOwnedSession(scope, deps);
         const limit = boundedInt(new URL(request.url), "limit", 1000, 10000);
-        return json({ messages: listMessages(scope.db, session.id, limit) });
+        return jsonResponse<MessagesResponse>({
+          messages: listMessages(scope.db, session.id, limit),
+        });
       },
     },
     {
@@ -149,7 +164,7 @@ export function sessionRoutes(deps: SessionDeps): readonly Route[] {
           requestId: requiredString(body, "requestId"),
           text: requiredString(body, "text"),
         });
-        return json({ submissionId }, 202);
+        return jsonResponse<SubmitMessageResponse>({ submissionId }, 202);
       },
     },
     {
@@ -158,7 +173,7 @@ export function sessionRoutes(deps: SessionDeps): readonly Route[] {
       handler: async (scope) => {
         const session = requireOwnedSession(scope, deps);
         await deps.supervisor.abort(session.id);
-        return json({ aborted: true });
+        return jsonResponse<AbortedResponse>({ aborted: true });
       },
     },
     {
@@ -167,7 +182,7 @@ export function sessionRoutes(deps: SessionDeps): readonly Route[] {
       handler: async (scope) => {
         const session = requireOwnedSession(scope, deps);
         await deps.supervisor.restart(session.id);
-        return json({ session: deps.supervisor.get(session.id) });
+        return jsonResponse<SessionResponse>({ session: requireOwnedSession(scope, deps) });
       },
     },
     {
@@ -177,7 +192,10 @@ export function sessionRoutes(deps: SessionDeps): readonly Route[] {
         const session = requireOwnedSession(scope, deps);
         const force = new URL(request.url).searchParams.get("force") === "true";
         await deps.supervisor.remove(session.id, { force });
-        return json({ deleted: true, preservedBranch: session.branch });
+        return jsonResponse<DeleteSessionResponse>({
+          deleted: true,
+          preservedBranch: session.branch,
+        });
       },
     },
     {

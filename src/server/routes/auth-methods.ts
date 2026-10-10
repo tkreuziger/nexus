@@ -1,4 +1,11 @@
 import type { Database } from "bun:sqlite";
+import type {
+  CreateAuthMethodResponse,
+  DeletedResponse,
+  ListAuthMethodsResponse,
+  ProjectResponse,
+  WireAuthMethod,
+} from "@nexus/client";
 import { parseCredentialInput } from "../../credentials.ts";
 import { encryptSecret } from "../../crypto/secrets.ts";
 import { HttpError } from "../../errors.ts";
@@ -10,30 +17,17 @@ import {
   insertAuthMethod,
   listAuthMethods,
 } from "../../store/auth-methods.ts";
-import type { AuthMethod, AuthMethodId, AuthMethodType, ProjectId, UserId } from "../../types.ts";
+import type { AuthMethod, AuthMethodId, AuthMethodType, ProjectId } from "../../types.ts";
 import type { RequestScope, Route } from "../contract.ts";
-import { optionalString, readJsonObject, requiredString } from "../json.ts";
+import { jsonResponse, optionalString, readJsonObject, requiredString } from "../json.ts";
 
 export interface AuthDeps {
   db: Database;
   secretKey: CryptoKey;
 }
 
-/** An auth method without its secret material. */
-export interface PublicAuthMethod {
-  id: AuthMethodId;
-  userId: UserId;
-  type: AuthMethodType;
-  provider: string;
-  label: string;
-  createdAt: string;
-  lastUsedAt: string | null;
-}
-
-const json = (body: unknown, status = 200): Response =>
-  Response.json(body, { status, headers: { "cache-control": "no-store" } });
-
-const publicView = (method: AuthMethod): PublicAuthMethod => ({
+/** Strip the credential: the wire contract never carries secret material. */
+const publicView = (method: AuthMethod): WireAuthMethod => ({
   id: method.id,
   userId: method.userId,
   type: method.type,
@@ -78,14 +72,16 @@ export function authMethodRoutes(deps: AuthDeps): readonly Route[] {
           label: optionalString(body, "label") ?? requiredString(body, "provider"),
           credentialCiphertext: await encryptSecret(deps.secretKey, JSON.stringify(credential)),
         });
-        return json({ authMethod: publicView(method) }, 201);
+        return jsonResponse<CreateAuthMethodResponse>({ authMethod: publicView(method) }, 201);
       },
     },
     {
       method: "GET",
       path: "/auth-methods",
       handler: (scope) =>
-        json({ authMethods: listAuthMethods(scope.db, scope.user.id).map(publicView) }),
+        jsonResponse<ListAuthMethodsResponse>({
+          authMethods: listAuthMethods(scope.db, scope.user.id).map(publicView),
+        }),
     },
     {
       method: "DELETE",
@@ -93,7 +89,7 @@ export function authMethodRoutes(deps: AuthDeps): readonly Route[] {
       handler: (scope) => {
         const method = requireOwnedMethod(scope, scope.params.id as AuthMethodId);
         deleteAuthMethod(scope.db, method.id);
-        return json({ deleted: true });
+        return jsonResponse<DeletedResponse>({ deleted: true });
       },
     },
     {
@@ -104,7 +100,9 @@ export function authMethodRoutes(deps: AuthDeps): readonly Route[] {
         const requested = authMethodIdOf(await readJsonObject(request));
         if (requested !== null) requireOwnedMethod(scope, requested);
         assignAuthMethod(scope.db, project.id, requested);
-        return json({ project: requireProject(scope.db, project.id, scope.user.id) });
+        return jsonResponse<ProjectResponse>({
+          project: requireProject(scope.db, project.id, scope.user.id),
+        });
       },
     },
   ];

@@ -1,20 +1,33 @@
+import type {
+  ContentResponse,
+  CreateProjectResponse,
+  GitLogResponse,
+  GitStatusResponse,
+  GitWorktreesResponse,
+  ListProjectsResponse,
+  ProjectResponse,
+} from "@nexus/client";
 import { readProjectContent } from "../../projects/content.ts";
 import { gitLog, gitStatus, gitWorktrees } from "../../projects/git.ts";
 import { registerProject, requireProject } from "../../projects/registry.ts";
 import { listProjects } from "../../store/projects.ts";
 import type { Project, ProjectId } from "../../types.ts";
 import type { RequestScope, Route } from "../contract.ts";
-import { boundedInt, optionalString, readJsonObject, requiredString } from "../json.ts";
-
-const json = (body: unknown, status = 200): Response =>
-  Response.json(body, { status, headers: { "cache-control": "no-store" } });
+import {
+  boundedInt,
+  jsonResponse,
+  optionalString,
+  readJsonObject,
+  requiredString,
+} from "../json.ts";
 
 const projectId = (scope: RequestScope): ProjectId => scope.params.id as ProjectId;
 
 const owned = (scope: RequestScope): Project =>
   requireProject(scope.db, projectId(scope), scope.user.id);
 
-const list = (scope: RequestScope) => json({ projects: listProjects(scope.db, scope.user.id) });
+const list = (scope: RequestScope): Response =>
+  jsonResponse<ListProjectsResponse>({ projects: listProjects(scope.db, scope.user.id) });
 
 async function register(scope: RequestScope, request: Request): Promise<Response> {
   const body = await readJsonObject(request);
@@ -22,28 +35,31 @@ async function register(scope: RequestScope, request: Request): Promise<Response
     path: requiredString(body, "path"),
     name: optionalString(body, "name"),
   });
-  return json({ project }, 201);
+  return jsonResponse<CreateProjectResponse>({ project }, 201);
 }
 
-const get = (scope: RequestScope) => json({ project: owned(scope) });
+const get = (scope: RequestScope): Response =>
+  jsonResponse<ProjectResponse>({ project: owned(scope) });
 
 async function content(scope: RequestScope, request: Request): Promise<Response> {
   const project = owned(scope);
   const requested = new URL(request.url).searchParams.get("path") ?? "";
-  return json({ content: await readProjectContent(project.path, requested) });
+  return jsonResponse<ContentResponse>({
+    content: await readProjectContent(project.path, requested),
+  });
 }
 
 async function status(scope: RequestScope): Promise<Response> {
-  return json({ status: await gitStatus(owned(scope).path) });
+  return jsonResponse<GitStatusResponse>({ status: await gitStatus(owned(scope).path) });
 }
 
 async function log(scope: RequestScope, request: Request): Promise<Response> {
   const limit = boundedInt(new URL(request.url), "limit", 20, 200);
-  return json({ commits: await gitLog(owned(scope).path, limit) });
+  return jsonResponse<GitLogResponse>({ commits: await gitLog(owned(scope).path, limit) });
 }
 
 async function worktrees(scope: RequestScope): Promise<Response> {
-  return json({ worktrees: await gitWorktrees(owned(scope).path) });
+  return jsonResponse<GitWorktreesResponse>({ worktrees: await gitWorktrees(owned(scope).path) });
 }
 
 /** Read-only project routes: registration, metadata, content, and git state (§6.2). */

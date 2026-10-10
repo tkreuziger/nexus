@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "workspaces": ["packages/*", "apps/*"],
   "scripts": {
     "start": "bun run src/server/main.ts",
     "dev": "bun run --watch src/server/main.ts",
@@ -14,7 +15,8 @@
   "dependencies": {
     "@earendil-works/chord": "1.1.0",
     "@earendil-works/pi-ai": "1.1.0",
-    "@earendil-works/pi-durable": "1.1.0"
+    "@earendil-works/pi-durable": "1.1.0",
+    "@nexus/client": "workspace:*"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",
