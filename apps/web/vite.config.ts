@@ -8,6 +8,8 @@ import { defineConfig } from "vite";
  */
 export default defineConfig({
   plugins: [react()],
+  // Monaco's language workers are ES modules; the default iife worker format cannot bundle them.
+  worker: { format: "es" },
   server: {
     port: 5173,
     proxy: {

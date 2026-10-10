@@ -6,12 +6,14 @@ import type {
   GitWorktreesResponse,
   ListProjectsResponse,
   ProjectResponse,
+  SearchResponse,
 } from "@nexus/client";
 import type { ModelCatalog } from "../../catalog.ts";
 import { HttpError } from "../../errors.ts";
 import { readProjectContent } from "../../projects/content.ts";
 import { gitLog, gitStatus, gitWorktrees } from "../../projects/git.ts";
 import { registerProject, requireProject } from "../../projects/registry.ts";
+import { searchProject } from "../../projects/search.ts";
 import { listProjects, setProjectDefaultModel } from "../../store/projects.ts";
 import type { ModelRef, Project, ProjectId } from "../../types.ts";
 import type { RequestScope, Route } from "../contract.ts";
@@ -52,6 +54,17 @@ async function content(scope: RequestScope, request: Request): Promise<Response>
   const requested = new URL(request.url).searchParams.get("path") ?? "";
   return jsonResponse<ContentResponse>({
     content: await readProjectContent(project.path, requested),
+  });
+}
+
+async function search(scope: RequestScope, request: Request): Promise<Response> {
+  const project = owned(scope);
+  const url = new URL(request.url);
+  const query = url.searchParams.get("q") ?? "";
+  if (query === "") throw new HttpError(400, '"q" must be a non-empty string');
+  const limit = boundedInt(url, "limit", 100, 500);
+  return jsonResponse<SearchResponse>({
+    ...(await searchProject(project.path, query, limit)),
   });
 }
 
@@ -103,13 +116,14 @@ async function setDefaultModel(
   return jsonResponse<ProjectResponse>({ project: owned(scope) });
 }
 
-/** Read-only project routes plus the two project settings: registration, metadata, content, git, model. */
+/** Read-only project routes plus the project's default model: registration, metadata, content, git. */
 export function projectRoutes(deps: ProjectDeps): readonly Route[] {
   return [
     { method: "POST", path: "/projects", handler: register },
     { method: "GET", path: "/projects", handler: list },
     { method: "GET", path: "/projects/:id", handler: get },
     { method: "GET", path: "/projects/:id/content", handler: content },
+    { method: "GET", path: "/projects/:id/search", handler: search },
     { method: "GET", path: "/projects/:id/git/status", handler: status },
     { method: "GET", path: "/projects/:id/git/log", handler: log },
     { method: "GET", path: "/projects/:id/git/worktrees", handler: worktrees },

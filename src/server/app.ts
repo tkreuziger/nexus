@@ -8,6 +8,7 @@ import type { Route } from "./contract.ts";
 import { resolveUser } from "./principal.ts";
 import { matchPath } from "./router.ts";
 import { authMethodRoutes } from "./routes/auth-methods.ts";
+import { fsRoutes } from "./routes/fs.ts";
 import { projectRoutes } from "./routes/projects.ts";
 import { providerRoutes } from "./routes/providers.ts";
 import { loginRoutes } from "./routes/session-auth.ts";
@@ -62,6 +63,7 @@ export function createApp(deps: AppDeps): (request: Request) => Promise<Response
   const routes: readonly Route[] = [
     ...loginRoutes,
     ...providerRoutes(deps),
+    ...fsRoutes,
     ...projectRoutes(deps),
     ...authMethodRoutes(deps),
     ...sessionRoutes(deps),
