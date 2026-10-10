@@ -24,6 +24,14 @@ names, so the web app offers a provider dropdown and a provider-then-model casca
 text. That is the same collection a harness resolves against, so anything the catalogue omits would
 have failed mid-turn anyway. 191 tests pass.
 
+The project frame also moved on. A project owns a sidebar of sections — git, files, sessions, settings
+— with the project itself as the first entry, so the overview is named by the project instead of by a
+label that reads the same on every one of them. A phone cannot spare a 190px column for that
+navigation, so below 720px the sidebar leaves the grid and becomes a drawer over the section: the
+hamburger in the project bar opens it, and the section link that was used, Escape, or the scrim behind
+it closes it. Hidden rather than merely translated off-canvas, so its links stay out of the tab order
+while it is closed.
+
 ## Context
 
 The server (`docs/plans/pi-session-server.md`, complete) exposes a bearer-authenticated HTTP API and a per-session server-sent event stream. It has no browser-facing surface: no login route, no CORS headers, no static file serving. The frontend is a **test harness for the server** first and a product surface second, so it should exercise every route rather than a convenient subset.
