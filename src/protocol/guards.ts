@@ -28,9 +28,18 @@ const asString = (source: Record<string, unknown>, key: string, label: string): 
   return value;
 };
 
+const asNumber = (source: Record<string, unknown>, key: string, label: string): number => {
+  const value = source[key];
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error(`${label}: "${key}" must be a number`);
+  }
+  return value;
+};
+
 export function asInitParams(value: unknown): InitParams {
   const source = asObject(value, "init");
   const model = asObject(source.model, "init.model");
+  const compaction = asObject(source.compaction, "init.compaction");
   const authMethodId = source.authMethodId;
   if (authMethodId !== null && typeof authMethodId !== "string") {
     throw new Error('init: "authMethodId" must be a string or null');
@@ -44,6 +53,10 @@ export function asInitParams(value: unknown): InitParams {
       modelId: asString(model, "modelId", "init.model"),
     },
     authMethodId,
+    compaction: {
+      reserveTokens: asNumber(compaction, "reserveTokens", "init.compaction"),
+      keepRecentTokens: asNumber(compaction, "keepRecentTokens", "init.compaction"),
+    },
   };
 }
 

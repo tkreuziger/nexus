@@ -145,6 +145,7 @@ export class SessionSupervisor {
       dbPath: join(this.config.piStorageDir, `${session.id}.sqlite`),
       model: session.model,
       authMethodId: project?.assignedAuthMethodId ?? null,
+      compaction: this.config.compaction,
     });
     setSessionConversation(this.db, session.id, ready.conversationId);
     setSessionStatus(this.db, session.id, "idle", child.pid ?? null);
