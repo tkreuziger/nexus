@@ -26,9 +26,11 @@ import { COMMANDS, type CommandContext } from "../commands.ts";
 import { applyCompletion, detectTrigger, type Trigger } from "../completions.ts";
 import { CodeBlock } from "../components/CodeBlock.tsx";
 import { type CompletionOption, Completions } from "../components/Completions.tsx";
+import { DiffView } from "../components/DiffView.tsx";
 import { Markdown } from "../components/Markdown.tsx";
 import { Modal } from "../components/Modal.tsx";
 import { SessionSettingsDialog } from "../components/SessionSettingsDialog.tsx";
+import { asFileEdit } from "../diff.ts";
 import { readDraft, writeDraft } from "../draft.ts";
 import { fuzzyRank } from "../fuzzy.ts";
 
@@ -116,12 +118,26 @@ function SendHint(): ReactElement {
   );
 }
 
+/** A tool call's arguments: a file edit reads as a patch, anything else as its JSON. */
+function ToolBody({ args }: { args: unknown }): ReactElement | null {
+  if (args === null) return null;
+  const edit = asFileEdit(args);
+  return edit === null ? (
+    <pre className="code">{JSON.stringify(args, null, 2)}</pre>
+  ) : (
+    <DiffView edit={edit} />
+  );
+}
+
 function Row({
   messageRole,
   content,
+  streaming = false,
 }: {
   messageRole: MessageRole;
   content: MirrorContent;
+  /** True for the in-flight assistant message, so a growing trace can say it is still going. */
+  streaming?: boolean;
 }): ReactElement {
   if (messageRole === "meta") return <p className="meta-row">{content.text}</p>;
   // A tool result is the bulkiest thing a transcript holds — whole files and command output — so it
@@ -152,7 +168,19 @@ function Row({
         {messageRole}
         {content.toolName === undefined ? "" : ` · ${content.toolName}`}
       </div>
-      {content.thinking === undefined ? null : <pre className="thinking">{content.thinking}</pre>}
+      {content.thinking === undefined ? null : (
+        <details className="msg-thinking">
+          <summary className="thinking-summary">
+            <span className="mono">thinking</span>
+            <span className="muted">
+              {streaming ? " · active" : ` · ${content.thinking.split("\n").length} lines`}
+            </span>
+          </summary>
+          <div className="tool-output">
+            <pre className="thinking">{content.thinking}</pre>
+          </div>
+        </details>
+      )}
       {content.text === "" ? null : messageRole === "assistant" ? (
         <Markdown text={content.text} />
       ) : (
@@ -160,11 +188,19 @@ function Row({
       )}
       {content.toolCalls === undefined ? null : (
         <ul className="list">
-          {content.toolCalls.map((call) => (
-            <li key={call.id} className="mono muted">
-              {call.name} {JSON.stringify(call.arguments)}
-            </li>
-          ))}
+          {content.toolCalls.map((call) => {
+            const edit = asFileEdit(call.arguments);
+            return (
+              <li key={call.id}>
+                <span className="mono muted">{call.name}</span>
+                {edit === null ? (
+                  <span className="mono muted"> {JSON.stringify(call.arguments)}</span>
+                ) : (
+                  <DiffView edit={edit} />
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </article>
@@ -511,7 +547,7 @@ export function SessionViewPage(): ReactElement {
               content={parseMirrorContent(row.content)}
             />
           ))}
-          {overlay === null ? null : <Row messageRole="assistant" content={overlay} />}
+          {overlay === null ? null : <Row messageRole="assistant" content={overlay} streaming />}
           {committed.length === 0 && overlay === null && messages.status === "success" ? (
             <p className="muted">Nothing has been said yet.</p>
           ) : null}
@@ -525,9 +561,7 @@ export function SessionViewPage(): ReactElement {
                       <span className="mono grow">{tool.name}</span>
                       <span className="tag live">running</span>
                     </div>
-                    {tool.args === null ? null : (
-                      <pre className="code">{JSON.stringify(tool.args, null, 2)}</pre>
-                    )}
+                    {tool.args === null ? null : <ToolBody args={tool.args} />}
                     {tool.output === "" ? null : <pre className="code">{tool.output}</pre>}
                   </div>
                 ) : (
@@ -535,9 +569,7 @@ export function SessionViewPage(): ReactElement {
                     <summary className="mono">
                       {tool.name} <span className="muted">· done</span>
                     </summary>
-                    {tool.args === null ? null : (
-                      <pre className="code">{JSON.stringify(tool.args, null, 2)}</pre>
-                    )}
+                    {tool.args === null ? null : <ToolBody args={tool.args} />}
                     {tool.output === "" ? null : <pre className="code">{tool.output}</pre>}
                   </details>
                 ),
@@ -551,15 +583,6 @@ export function SessionViewPage(): ReactElement {
         <div className="chat-col chat-foot-col">
           <form className="stack composer" onSubmit={submit}>
             <div className="composer-field">
-              {activeField === "inline" ? (
-                <Completions
-                  id="prompt-completions"
-                  options={options}
-                  selected={selected}
-                  onPick={pick}
-                  onHover={setSelected}
-                />
-              ) : null}
               <textarea
                 ref={composerRef}
                 className="composer-input"
@@ -569,11 +592,9 @@ export function SessionViewPage(): ReactElement {
                 aria-label="Prompt"
                 role="combobox"
                 aria-expanded={options.length > 0}
-                aria-controls="prompt-completions"
+                aria-controls="completions"
                 aria-autocomplete="list"
-                aria-activedescendant={
-                  options.length === 0 ? undefined : `prompt-completions-${selected}`
-                }
+                aria-activedescendant={options.length === 0 ? undefined : `completions-${selected}`}
                 onChange={onTextChange}
                 onKeyDown={onKeyDown}
                 onKeyUp={onCaretMove}
@@ -636,15 +657,6 @@ export function SessionViewPage(): ReactElement {
           <Modal open={expanded} title="Prompt" size="large" onClose={() => setExpanded(false)}>
             <div className="prompt-modal">
               <div className="prompt-field">
-                {activeField === "modal" ? (
-                  <Completions
-                    id="modal-completions"
-                    options={options}
-                    selected={selected}
-                    onPick={pick}
-                    onHover={setSelected}
-                  />
-                ) : null}
                 <textarea
                   ref={modalRef}
                   className="composer-input composer-input-large"
@@ -653,10 +665,10 @@ export function SessionViewPage(): ReactElement {
                   aria-label="Prompt"
                   role="combobox"
                   aria-expanded={options.length > 0}
-                  aria-controls="modal-completions"
+                  aria-controls="completions"
                   aria-autocomplete="list"
                   aria-activedescendant={
-                    options.length === 0 ? undefined : `modal-completions-${selected}`
+                    options.length === 0 ? undefined : `completions-${selected}`
                   }
                   onChange={onTextChange}
                   onKeyDown={onKeyDown}
@@ -683,6 +695,16 @@ export function SessionViewPage(): ReactElement {
           </Modal>
         </div>
       </footer>
+
+      <Completions
+        id="completions"
+        title={trigger?.kind === "command" ? "Commands" : "Files"}
+        options={options}
+        selected={selected}
+        onPick={pick}
+        onHover={setSelected}
+        onDismiss={() => setDismissed(true)}
+      />
     </section>
   );
 }

@@ -430,6 +430,62 @@ a {
   border-color: var(--muted);
 }
 
+/* A thinking trace is the bulkiest part of an assistant message and the least often reread, so it
+   folds away like a tool result — with the summary saying whether it is still running. */
+.msg-thinking {
+  margin-bottom: 8px;
+}
+
+.thinking-summary {
+  cursor: pointer;
+  font-size: 12px;
+}
+
+/* A file edit as a patch. Inline rather than side by side: the chat column is narrow, and two
+   columns of code in one reads worse than one column with the change marked. */
+.diff {
+  margin: 0;
+}
+
+.diff-path {
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.diff-hunk {
+  margin: 0 0 6px;
+  padding: 6px 0;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.diff-line {
+  display: block;
+  padding: 0 10px;
+  white-space: pre;
+}
+
+.diff-same {
+  color: var(--muted);
+}
+
+.diff-removed {
+  background: color-mix(in srgb, var(--error) 14%, transparent);
+  color: var(--error);
+}
+
+.diff-added {
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+  color: var(--success);
+}
+
 /* Transcript */
 
 .transcript {
@@ -593,30 +649,68 @@ a {
   display: block;
 }
 
-/* Commands after `/` and worktree files after `@`, floating above the box that is being typed in. */
-.completions {
+/* Commands after `/` and worktree files after `@`, centred so the choice is the thing in view.
+   An overlay rather than a dialog: the prompt keeps the caret while this is up. */
+.completions-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+/* A full-bleed button, because dismissing on a click outside is a control and reads as one to a
+   screen reader. Focus never lands on it: mousedown is refused, so the prompt keeps the caret. */
+.completions-scrim {
   position: absolute;
-  bottom: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  z-index: 5;
-  margin: 0;
-  padding: 4px;
-  list-style: none;
-  max-height: 280px;
-  overflow-y: auto;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  background: rgb(0 0 0 / 0.3);
+  cursor: default;
+}
+
+.completions-panel {
+  position: relative;
+  width: min(560px, 100%);
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--surface);
-  box-shadow: 0 6px 20px rgb(0 0 0 / 0.18);
+  background: var(--bg);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.3);
+}
+
+.completions-title {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.completions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
 }
 
 .completion {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  padding: 5px 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
   border-radius: 4px;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
   cursor: pointer;
 }
 
