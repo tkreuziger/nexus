@@ -314,6 +314,16 @@ export interface AbortedResponse {
   aborted: true;
 }
 
+/** The context was reset; the transcript and the worktree are untouched. */
+export interface ResetSessionResponse {
+  reset: true;
+}
+
+/** A manual compaction was admitted; it places its summary at the next boundary. */
+export interface CompactSessionResponse {
+  compacting: true;
+}
+
 /**
  * The worktree files a `@` mention completes against, relative to the worktree root and always
  * slash-separated. Fetched whole and filtered in the browser, so typing does not re-walk the tree.

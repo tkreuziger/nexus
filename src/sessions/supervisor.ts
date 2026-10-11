@@ -173,6 +173,23 @@ export class SessionSupervisor {
   }
 
   /**
+   * Start the conversation's context over, keeping the transcript and the worktree. Asked for
+   * mid-turn it is placed at the next boundary, so the answer being written is not interrupted.
+   */
+  async reset(id: SessionId): Promise<void> {
+    const running = this.#running.get(id);
+    if (running === undefined) throw new HttpError(409, "session is not running");
+    await running.client.reset();
+  }
+
+  /** Compact the context now, rather than waiting for the threshold to reach it. */
+  async compact(id: SessionId): Promise<void> {
+    const running = this.#running.get(id);
+    if (running === undefined) throw new HttpError(409, "session is not running");
+    await running.client.compact();
+  }
+
+  /**
    * Change what the session runs with. The process is told first: if it refuses, nothing is recorded
    * and the two cannot disagree. A stopped session simply keeps the setting for its next start.
    */

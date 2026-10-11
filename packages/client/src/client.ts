@@ -220,6 +220,16 @@ export class ApiClient {
     return this.#request("POST", `/sessions/${encodeURIComponent(id)}/abort`);
   }
 
+  /** Drop the conversation's context and start over; the transcript and worktree stay. */
+  resetSession(id: string): Promise<wire.ResetSessionResponse> {
+    return this.#request("POST", `/sessions/${encodeURIComponent(id)}/reset`);
+  }
+
+  /** Compact the context now rather than waiting for the threshold to reach it. */
+  compactSession(id: string): Promise<wire.CompactSessionResponse> {
+    return this.#request("POST", `/sessions/${encodeURIComponent(id)}/compact`);
+  }
+
   /** Change the model and reasoning effort the session runs with. */
   configureSession(id: string, body: wire.ConfigureSessionRequest): Promise<wire.SessionResponse> {
     return this.#request("POST", `/sessions/${encodeURIComponent(id)}/settings`, { body });

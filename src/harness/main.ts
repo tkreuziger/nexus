@@ -102,6 +102,16 @@ rpc.onRequest(SERVER_METHODS.configure, async (params) => {
   return {};
 });
 rpc.onRequest(SERVER_METHODS.submit, handleSubmit);
+// Both admit a write and return: a reset or a compaction asked for mid-turn is placed at the next
+// boundary rather than interrupting the answer being written.
+rpc.onRequest(SERVER_METHODS.reset, async () => {
+  await requireSession().runtime.root.reset(undefined, BACKGROUND_CONTEXT);
+  return {};
+});
+rpc.onRequest(SERVER_METHODS.compact, async () => {
+  await requireSession().runtime.root.compact(undefined, BACKGROUND_CONTEXT);
+  return {};
+});
 rpc.onRequest(SERVER_METHODS.subscribe, async (params) => {
   const { subscriptionId } = asSubscribeParams(params);
   await attach(requireSession(), subscriptionId);

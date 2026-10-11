@@ -1,11 +1,13 @@
 import type { Database } from "bun:sqlite";
 import {
   type AbortedResponse,
+  type CompactSessionResponse,
   type CreateSessionResponse,
   type DeleteSessionResponse,
   type ListSessionFilesResponse,
   type ListSessionsResponse,
   type MessagesResponse,
+  type ResetSessionResponse,
   type SessionResponse,
   type SubmitMessageResponse,
   THINKING_LEVELS,
@@ -255,6 +257,24 @@ export function sessionRoutes(deps: SessionDeps): readonly Route[] {
             thinkingLevel: thinkingLevelFrom(body),
           }),
         });
+      },
+    },
+    {
+      method: "POST",
+      path: "/sessions/:id/reset",
+      handler: async (scope) => {
+        const session = requireOwnedSession(scope, deps);
+        await deps.supervisor.reset(session.id);
+        return jsonResponse<ResetSessionResponse>({ reset: true });
+      },
+    },
+    {
+      method: "POST",
+      path: "/sessions/:id/compact",
+      handler: async (scope) => {
+        const session = requireOwnedSession(scope, deps);
+        await deps.supervisor.compact(session.id);
+        return jsonResponse<CompactSessionResponse>({ compacting: true });
       },
     },
     {

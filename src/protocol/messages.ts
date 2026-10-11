@@ -6,6 +6,8 @@ import type { ModelRef, SessionStatus, ThinkingLevel } from "../types.ts";
 export const SERVER_METHODS = {
   init: "init",
   configure: "configure",
+  reset: "reset",
+  compact: "compact",
   submit: "submit",
   abort: "abort",
   subscribe: "subscribe",

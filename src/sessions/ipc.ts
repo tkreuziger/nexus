@@ -42,6 +42,14 @@ export class HarnessClient {
     await this.rpc.request(SERVER_METHODS.configure, params);
   }
 
+  async reset(): Promise<void> {
+    await this.rpc.request(SERVER_METHODS.reset, {});
+  }
+
+  async compact(): Promise<void> {
+    await this.rpc.request(SERVER_METHODS.compact, {});
+  }
+
   submit(params: SubmitParams): Promise<SubmitResult> {
     return this.rpc.request<SubmitResult>(SERVER_METHODS.submit, params);
   }

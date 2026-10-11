@@ -626,3 +626,72 @@ describe("session files and settings", () => {
     expect(unknownProvider.status).toBe(400);
   }, 30_000);
 });
+
+describe("reset and compact", () => {
+  /** Send one prompt and wait for the answer to land in the mirror. */
+  async function sayHello(id: SessionId, requestId: string): Promise<void> {
+    const finished = readEvents(id, (events) => eventTypes(events).includes("run_end"));
+    await call(`/sessions/${id}/messages`, {
+      method: "POST",
+      body: JSON.stringify({ requestId, text: "hello" }),
+    });
+    await finished;
+  }
+
+  const messagesOf = async (id: SessionId) =>
+    jsonOf<{ messages: { role: string; content: string }[] }>(
+      await call(`/sessions/${id}/messages`),
+    );
+
+  test("a reset drops the context and keeps every row of the transcript", async () => {
+    const projectId = await registerProject();
+    const id = await createSession(projectId);
+    await waitForStatus(id, "idle");
+    await sayHello(id, "before-reset");
+    expect((await messagesOf(id)).messages.map((message) => message.role)).toEqual([
+      "user",
+      "assistant",
+    ]);
+
+    const response = await call(`/sessions/${id}/reset`, { method: "POST" });
+    expect(response.status).toBe(200);
+    expect(await jsonOf<{ reset: boolean }>(response)).toEqual({ reset: true });
+
+    // A reset is a marker in the transcript, not a deletion: nothing said before it disappears.
+    const after = await waitFor(async () => {
+      const body = await messagesOf(id);
+      return body.messages.some((message) => message.role === "meta") ? body.messages : undefined;
+    }, "the reset marker");
+    expect(after.map((message) => message.role)).toEqual(["user", "assistant", "meta"]);
+    expect(after.some((message) => message.content.includes("context reset"))).toBe(true);
+  }, 30_000);
+
+  test("compaction can be asked for by hand and leaves the session usable", async () => {
+    const projectId = await registerProject();
+    const id = await createSession(projectId);
+    await waitForStatus(id, "idle");
+    await sayHello(id, "before-compact");
+
+    // A 200 is the whole chain: if the harness had no `compact` handler the RPC would reject and the
+    // route would answer 500. Whether a two-message conversation is worth summarising is Pi's call,
+    // so this does not assert that a marker appears.
+    const response = await call(`/sessions/${id}/compact`, { method: "POST" });
+    expect(response.status).toBe(200);
+    expect(await jsonOf<{ compacting: boolean }>(response)).toEqual({ compacting: true });
+
+    await sayHello(id, "after-compact");
+    const mirrored = await messagesOf(id);
+    expect(mirrored.messages.filter((message) => message.role === "user").length).toBe(2);
+  }, 30_000);
+
+  test("both refuse a session with no process", async () => {
+    const projectId = await registerProject();
+    const id = await createSession(projectId);
+    await waitForStatus(id, "idle");
+    await supervisor.stop(id);
+
+    for (const path of ["reset", "compact"]) {
+      expect((await call(`/sessions/${id}/${path}`, { method: "POST" })).status).toBe(409);
+    }
+  }, 30_000);
+});

@@ -25,7 +25,9 @@ import { api } from "../api.ts";
 import { COMMANDS, type CommandContext } from "../commands.ts";
 import { applyCompletion, detectTrigger, type Trigger } from "../completions.ts";
 import { CodeBlock } from "../components/CodeBlock.tsx";
+import { CommandHelp, SessionInfo } from "../components/CommandPanels.tsx";
 import { type CompletionOption, Completions } from "../components/Completions.tsx";
+import { ConversationTree, type TreePoint } from "../components/ConversationTree.tsx";
 import { DiffView } from "../components/DiffView.tsx";
 import { Markdown } from "../components/Markdown.tsx";
 import { Modal } from "../components/Modal.tsx";
@@ -116,6 +118,12 @@ function SendHint(): ReactElement {
       <span>to send prompt</span>
     </span>
   );
+}
+
+/** A one-line excerpt of a message, for the conversation tree. */
+function excerpt(text: string): string {
+  const line = text.split("\n").find((entry) => entry.trim() !== "") ?? "";
+  return line.length > 90 ? `${line.slice(0, 90)}…` : line;
 }
 
 /** A tool call's arguments: a file edit reads as a patch, anything else as its JSON. */
@@ -308,6 +316,8 @@ export function SessionViewPage(): ReactElement {
   const modalRef = useRef<HTMLTextAreaElement>(null);
   const [expanded, setExpanded] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /** Which command panel is up, if any. One piece of state, because only one can be. */
+  const [panel, setPanel] = useState<"help" | "session" | "tree" | null>(null);
 
   // Which completion is on offer depends on the caret, so it is state rather than a ref: moving the
   // caret has to re-render the list.
@@ -348,6 +358,8 @@ export function SessionViewPage(): ReactElement {
   });
 
   const abort = useMutation({ mutationFn: () => api.abortSession(id) });
+  const reset = useMutation({ mutationFn: () => api.resetSession(id) });
+  const compact = useMutation({ mutationFn: () => api.compactSession(id) });
   const restart = useMutation({
     mutationFn: () => api.restartSession(id),
     onSuccess: async () => {
@@ -380,14 +392,12 @@ export function SessionViewPage(): ReactElement {
   // streaming turn pays nothing for any of this.
   const trigger: Trigger | null = dismissed ? null : detectTrigger(text, caret);
   const commandContext: CommandContext = {
-    running: status === "running",
-    abort: () => abort.mutate(),
-    restart: () => restart.mutate(),
-    expand: () => setExpanded(true),
-    clear: () => {
-      setText("");
-      writeDraft(id, "");
-    },
+    attached: !detached,
+    reset: () => reset.mutate(),
+    compact: () => compact.mutate(),
+    help: () => setPanel("help"),
+    info: () => setPanel("session"),
+    tree: () => setPanel("tree"),
   };
   const options: CompletionOption[] =
     trigger === null
@@ -470,6 +480,25 @@ export function SessionViewPage(): ReactElement {
   const usageText = formatUsage(live.usage);
   if (usageText !== null) meta.push(usageText);
 
+  // The conversation's user messages, for the tree panel.
+  const treePoints: TreePoint[] = committed
+    .filter((row) => row.role === "user")
+    .map((row) => ({
+      entryId: row.entryId,
+      sequence: row.sequence,
+      text: excerpt(parseMirrorContent(row.content).text),
+    }));
+
+  /** Put a chosen message at the top of the transcript, and stay there. */
+  const jumpToEntry = (entryId: string): void => {
+    const element = document.getElementById(`entry-${entryId}`);
+    if (element === null) return;
+    // Landing away from the bottom means the view should stay put rather than follow new output.
+    stickRef.current = false;
+    setAtBottom(false);
+    element.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   return (
     <section className="chat">
       <header className="chat-head">
@@ -541,11 +570,10 @@ export function SessionViewPage(): ReactElement {
             </p>
           ) : null}
           {committed.map((row) => (
-            <Row
-              key={row.entryId}
-              messageRole={row.role}
-              content={parseMirrorContent(row.content)}
-            />
+            // The wrapper carries the id the conversation tree jumps to.
+            <div key={row.entryId} id={`entry-${row.entryId}`}>
+              <Row messageRole={row.role} content={parseMirrorContent(row.content)} />
+            </div>
           ))}
           {overlay === null ? null : <Row messageRole="assistant" content={overlay} streaming />}
           {committed.length === 0 && overlay === null && messages.status === "success" ? (
@@ -695,6 +723,20 @@ export function SessionViewPage(): ReactElement {
           </Modal>
         </div>
       </footer>
+
+      <CommandHelp open={panel === "help"} onClose={() => setPanel(null)} />
+      <SessionInfo
+        session={session.status === "success" ? session.data.session : null}
+        tokens={usageText}
+        open={panel === "session"}
+        onClose={() => setPanel(null)}
+      />
+      <ConversationTree
+        points={treePoints}
+        open={panel === "tree"}
+        onClose={() => setPanel(null)}
+        onJump={jumpToEntry}
+      />
 
       <Completions
         id="completions"
